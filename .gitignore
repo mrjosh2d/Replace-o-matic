@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Vaults hold the real names and numbers. Never commit them.
+*vault*.json
+
+# Local model weights
+models/
