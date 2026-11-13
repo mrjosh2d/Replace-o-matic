@@ -65,6 +65,10 @@ def values(proposal):
         ("Vancouver, BC V6B 1A1, Canada", "address", "Vancouver, BC V6B 1A1"),
         ("by Oyelaran, Schmidt & Lindqvist PC today", "company", "Oyelaran, Schmidt & Lindqvist PC"),
         ("HARROWGATE & VOSS, P.A.\n", "company", "HARROWGATE & VOSS, P.A."),
+        ("LAW OFFICES\n#1 OLD CAPITAL SQUARE\nSPRINGFIELD, ILLINOIS 00000\n", "address", "#1 OLD CAPITAL SQUARE"),
+        ("LAW OFFICES\n#1 OLD CAPITAL SQUARE\nSPRINGFIELD, ILLINOIS 00000\n", "address", "SPRINGFIELD, ILLINOIS 00000"),
+        ("offices at 4120 Harbor View Drive, Suite 300, Tacoma", "address", "4120 Harbor View Drive, Suite 300"),
+        ("mail to P.O. Box 71188 today", "address", "P.O. Box 71188"),
         ("Call (212) 555-0147 now", "phone", "(212) 555-0147"),
         ("Call +1 212.555.0147 now", "phone", "+1 212.555.0147"),
         ("Call 212-555-0147.", "phone", "212-555-0147"),
@@ -83,6 +87,8 @@ def test_regex_detects(text, expected_type, expected_value):
         "invoice 1234-56-78901",
         "000-12-3456",  # invalid SSN area
         "under the Delaware General Corporation Law",
+        "the Arizona Revised Limited Liability Company Act",
+        "Section 5 applies and 30 days later the road closed",
         "the account was opened. In 2019 the number 12345678 appeared",
         "the account was closed in 2019",
         "see page 212 and 555",
@@ -173,6 +179,39 @@ def test_all_caps_name_propagates_its_title_case_short_form():
     by_value = {e["value"]: e["entity"] for e in proposal["proposed"].values()}
     assert by_value["Pinnacle"] == by_value["PINNACLE TITLE & ESCROW, INC."]
     assert by_value["Voss"] == by_value["KAREN VOSS"]
+
+
+TRUST_TEXT = (
+    "I, Ulysses S Grant, grant my Trustee the powers below. My Trustee may pay the Marital Share "
+    "to my wife, Julia D. Grant. The Trust Protector may remove any Trustee. Each beneficiary "
+    "of the trust takes a share. Thomas Banks is successor Trustee; Banks may resign. "
+    "Gifts Limited to tuition are exempt. The Internal Revenue Code controls."
+)
+
+
+def test_role_words_and_defined_terms_are_not_names():
+    generic = ["my Trustee", "My Trustee", "Trustee", "Marital Share", "my wife", "I", "trust",
+               "beneficiary", "The Trust Protector", "Trust Protector", "Internal Revenue Code"]  # fmt: skip
+    ner = fake_ner(person=["Ulysses S Grant", "Julia D. Grant", "Thomas Banks"] + generic[:8], company=generic[8:])
+    found = {e["value"] for e in scan_text(TRUST_TEXT, ner=ner)["proposed"].values()}
+    assert found == {"Ulysses S Grant", "Julia D. Grant", "Thomas Banks", "Banks"}
+
+
+def test_surname_that_is_also_a_word_survives_the_vocabulary_filter():
+    # "grant" appears in lower case, yet the people named Grant are still caught,
+    # and the bare surname "Banks" is propagated although "bank" is a common word.
+    proposal = scan_text(TRUST_TEXT, ner=fake_ner(person=["Ulysses S Grant", "Julia D. Grant", "Thomas Banks"]))
+    vault = merge_vault(None, proposal["proposed"])
+    safe = apply_vault(TRUST_TEXT, vault)
+    assert "Grant" not in safe and "Banks" not in safe
+    assert "grant my Trustee" in safe and "Gifts Limited to tuition" in safe
+    assert rehydrate_text(safe, vault) == TRUST_TEXT
+
+
+def test_model_addresses_without_substance_are_dropped():
+    text = "The State of Arizona governs. See the address set forth in Section 17.12, or 84101."
+    ner = fake_ner(address=["State of Arizona", "address set forth in Section 17.12", "84101"])
+    assert scan_text(text, ner=ner)["proposed"] == {}
 
 
 def test_entity_descriptions_are_not_companies():

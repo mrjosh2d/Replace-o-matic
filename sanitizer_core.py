@@ -71,6 +71,12 @@ _CO_SUFFIX = (
     r"|Ltd\.|Ltd|Limited|L\.P\.|LP|PLC|P\.C\.|PC|P\.A\.|N\.A\.|GmbH)"
 )
 _CO_WORD = r"[A-Z][\w'’.-]*"
+_STREET_WORDS = (
+    "Street St Avenue Ave Road Rd Drive Dr Lane Ln Boulevard Blvd Way Place Pl Square Sq "
+    "Terrace Parkway Pkwy Pike Highway Hwy Circle Cir Plaza Trail Court Ct"
+).split()
+# Capitalised or ALL CAPS only: "30 days later the road closed" is not an address.
+_STREET_TYPE = "(?:" + "|".join(_STREET_WORDS + [w.upper() for w in _STREET_WORDS]) + ")"
 _FIRM_NAME = r"(?!(?:Esq|Jr|Sr|Inc|LLC|LLP)\b)[A-Z][\w'’-]*"
 # Words that end a firm's name without being a legal suffix: "Zhang & Associates".
 _CO_KIND = r"(?:Associates|Partners|Holdings|Group|ASSOCIATES|PARTNERS|HOLDINGS|GROUP)"
@@ -116,7 +122,9 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         re.compile(
             _B + _CO_WORD + r"(?:[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,5}?,?[ \t]+"
             + r"(?=[A-Z])"  # "a Delaware limited liability company" is not a name
-            + _CO_SUFFIX + r"(?!\w)(?![ \t]+(?:Law|Act|Code)\b)"  # "General Corporation Law"
+            + _CO_SUFFIX
+            # not "General Corporation Law", "Limited Liability Company", "Gifts Limited to ..."
+            + r"(?!\w)(?![ \t]+(?:Law|Act|Code|Liability|Partnership|Power|Powers|to|by|in|for)\b)"
         ),
     ),
     # Law-firm lists: "Oyelaran, Schmidt & Lindqvist PC". Each listed name is one
@@ -134,12 +142,21 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             _B + _CO_WORD + r"(?:[ \t]+" + _CO_WORD + r"){0,3}?[ \t]+(?:&[ \t]+)?" + _CO_KIND + r"(?!\w)"
         ),
     ),
+    # Street line: "#1 Old Capital Square", "4120 Harbor View Drive, Suite 300"
+    (
+        "address",
+        re.compile(
+            r"(?<![\w-])#?\d{1,6}[A-Za-z]?[ \t]+(?:[A-Z0-9][A-Za-z0-9.'’-]*[ \t]+){0,4}?" + _STREET_TYPE
+            + r"\b\.?(?:,?[ \t]+(?i:Suite|Ste\.?|Apt\.?|Unit|Floor|Fl\.?|Room|#)[ \t]*[\w-]+)?"
+        ),
+    ),
+    ("address", re.compile(r"\bP\.?[ \t]?O\.?[ \t]+Box[ \t]+\d+\b", re.IGNORECASE)),
     # "City, ST 12345": the half of an address the model most often drops
     (
         "address",
         re.compile(
-            _B + r"(?:[A-Z][a-z]+\.?[ \t]+){0,2}[A-Z][a-z]+,[ \t]+"
-            r"(?:[A-Z]{2}|[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?)[ \t]+"  # OH, Ohio, New York
+            _B + r"(?:[A-Z][A-Za-z]+\.?[ \t]+){0,2}[A-Z][A-Za-z]+,[ \t]+"
+            r"(?:[A-Z]{2}|[A-Z][A-Za-z]+(?:[ \t]+[A-Z][A-Za-z]+)?)[ \t]+"  # OH, Ohio, NEW YORK
             r"(?:\d{5}(?:-\d{4})?|[A-Z]\d[A-Z][ \t]?\d[A-Z]\d)" + _E  # US zip or Canadian code
         ),
     ),
@@ -554,7 +571,7 @@ def _is_generic(d: Detection, span: str, lowercase_words: set[str]) -> bool:
         # A bare surname or first name derived from a full name that passed. Kept
         # even if the document also uses it as an ordinary word ("Grant", "Will"),
         # but not if it is legal vocabulary ("Trustee" from "Jane Roe, Trustee").
-        return all(_is_vocabulary(w.rstrip(".")) for w in words)
+        return all(w.rstrip(".").casefold() in _LEGAL_VOCABULARY | _FUNCTION_WORDS for w in words)
     if words and words[0].casefold() in _DETERMINERS:
         return True  # "my Trustee", "each Trustor": names do not start this way
     return not any(
@@ -579,6 +596,14 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             continue
         if d.source != "regex" and _is_generic(d, text[start:end], lowercase_words):
             continue  # "my Trustee", "trust", "Marital Share", "Employee"
+        if d.source == "regex" and d.type == "company":
+            # "See Group", "Survivor Limited": a heading that happens to end in a
+            # word firms use. Unambiguous suffixes (LLC, Inc., N.A.) are never dropped.
+            weak = re.search(r"[,\s]+(?:&\s+)?(?:Limited|LIMITED|Company|COMPANY|" + _CO_KIND + r")$", text[start:end])
+            if weak and _is_generic(
+                Detection(start, start + weak.start(), "company"), text[start : start + weak.start()], lowercase_words
+            ):
+                continue
         if d.type in ("person", "company"):
             bare = text[start:end]
             if d.type == "company" and re.search(r"\bCourt\b", bare):
@@ -611,7 +636,11 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
     return [
         d
         for d in merged
-        if not (d.type == "address" and d.source != "regex" and not re.search(r"\d", text[d.start : d.end]))
+        if not (
+            d.type == "address"
+            and d.source != "regex"
+            and not re.match(r"(?=.*\d)(?=.*[A-Za-z]{3})[#\dA-Z]", text[d.start : d.end], re.DOTALL)
+        )
     ]
 
 
