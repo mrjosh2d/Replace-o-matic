@@ -54,6 +54,17 @@ def values(proposal):
         ("acct 1234 5678 9012", "financial_id", "1234 5678 9012"),
         ("IBAN GB29 NWBK 6016 1331 9268 19 applies", "financial_id", "GB29 NWBK 6016 1331 9268 19"),
         ("Contact j.smith+legal@acme-corp.com.", "email", "j.smith+legal@acme-corp.com"),
+        ("ITIN 900-41-7782 applies", "financial_id", "900-41-7782"),
+        ("your account at Golden Valley Credit Union, number 4402981156?", "financial_id", "4402981156"),
+        ("a personal operating account, no. 6150219983, at", "financial_id", "6150219983"),
+        ("the savings account ending in 4410, and", "financial_id", "4410"),
+        ("SSN: 900-77-1204\nMRN: HM-0066412\n", "financial_id", "HM-0066412"),
+        ("Member ID GCM 884-20-1167.", "financial_id", "GCM 884-20-1167"),
+        ("lives in Tucson, Arizona 85712.", "address", "Tucson, Arizona 85712"),
+        ("office in New York, New York 10018", "address", "New York, New York 10018"),
+        ("Vancouver, BC V6B 1A1, Canada", "address", "Vancouver, BC V6B 1A1"),
+        ("by Oyelaran, Schmidt & Lindqvist PC today", "company", "Oyelaran, Schmidt & Lindqvist PC"),
+        ("HARROWGATE & VOSS, P.A.\n", "company", "HARROWGATE & VOSS, P.A."),
         ("Call (212) 555-0147 now", "phone", "(212) 555-0147"),
         ("Call +1 212.555.0147 now", "phone", "+1 212.555.0147"),
         ("Call 212-555-0147.", "phone", "212-555-0147"),
@@ -71,6 +82,8 @@ def test_regex_detects(text, expected_type, expected_value):
         "dated 2024-01-15",
         "invoice 1234-56-78901",
         "000-12-3456",  # invalid SSN area
+        "under the Delaware General Corporation Law",
+        "the account was opened. In 2019 the number 12345678 appeared",
         "the account was closed in 2019",
         "see page 212 and 555",
     ],
@@ -133,6 +146,39 @@ def test_first_name_alone_is_caught_and_linked():
     assert apply_vault(text, vault) == (
         "[PERSON_1] signed. [PERSON_1_ALIAS_1] agrees. Ms. [PERSON_1_ALIAS_2]'s copy. Mariana did not."
     )
+
+
+def test_surname_with_particles_is_caught_whole():
+    text = "Pieter van der Meer signed. Mr. van der Meer left. Ana de la Cruz stayed; de la Cruz agreed."
+    proposal = scan_text(text, ner=fake_ner(person=["Pieter van der Meer", "Ana de la Cruz"]))
+    found = {e["value"] for e in proposal["proposed"].values()}
+    assert {"van der Meer", "de la Cruz"} <= found
+    vault = merge_vault(None, proposal["proposed"])
+    safe = apply_vault(text, vault)
+    assert "van der" not in safe and "de la" not in safe
+    assert rehydrate_text(safe, vault) == text
+
+
+def test_firm_list_does_not_swallow_the_lawyer_named_before_it():
+    text = "represented by Priya Venkat, Esq., Oyelaran, Schmidt & Lindqvist PC, 410 Fifth Avenue. Ms. Venkat will appear."
+    proposal = scan_text(text, ner=fake_ner(person=["Priya Venkat"]))
+    found = {e["value"]: e["type"] for e in proposal["proposed"].values()}
+    assert found["Oyelaran, Schmidt & Lindqvist PC"] == "company"
+    assert found["Priya Venkat"] == found["Venkat"] == "person"
+
+
+def test_all_caps_name_propagates_its_title_case_short_form():
+    text = "PINNACLE TITLE & ESCROW, INC.\n\nPinnacle will record the deed. KAREN VOSS signed; Ms. Voss left."
+    proposal = scan_text(text, ner=fake_ner(person=["KAREN VOSS"]))
+    by_value = {e["value"]: e["entity"] for e in proposal["proposed"].values()}
+    assert by_value["Pinnacle"] == by_value["PINNACLE TITLE & ESCROW, INC."]
+    assert by_value["Voss"] == by_value["KAREN VOSS"]
+
+
+def test_entity_descriptions_are_not_companies():
+    text = "Acme Works LLC, a Delaware corporation, and the Claimant agree."
+    ner = fake_ner(company=["Delaware corporation", "Claimant"])
+    assert values(scan_text(text, ner=ner)) == {"[COMPANY_1]": "Acme Works LLC"}
 
 
 def test_shared_first_name_is_not_linked_to_either_person():

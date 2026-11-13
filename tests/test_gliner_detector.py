@@ -155,7 +155,7 @@ def load_eval(name):
         return json.load(fh)
 
 
-@pytest.mark.parametrize("name", ["passages.json"])
+@pytest.mark.parametrize("name", ["passages.json", "holdout.json"])
 def test_eval_labels_occur_in_their_passages(name):
     for passage in load_eval(name):
         for entity in passage["entities"]:

@@ -10,7 +10,7 @@ machine, and swapped back afterwards using a local JSON vault.
 |---|---|---|
 | 1 | Deterministic core: vault, regex detectors, `scan_text`, `apply_vault`, `rehydrate_text`, alias linking, pytest suite | **Done** |
 | 2 | GLiNER (ONNX) detector plugged into `scan_text`; offline model provisioning; surname and company-name propagation | **Done** |
-| 3 | Long-document handling and detection quality | Planned |
+| 3 | Long-document handling and detection quality: labelled passages, measurement script, gap fixes | **Done** |
 | 4 | Vault hardening and a CLI | Planned |
 
 ## Step 1: deterministic core (done)
@@ -105,12 +105,65 @@ that serves the large files).
 The `gliner` package was chosen over driving `onnxruntime` directly. It brings
 PyTorch along (the venv is about 5.5 GB), which is accepted.
 
-## Step 3: long documents and quality
+## Step 3: long documents and detection quality (done)
 
-- Smarter chunking: break windows at paragraph or sentence boundaries.
-- First-name-only references ("John said") are not propagated; decide whether they should be.
-- A small labelled set of realistic legal passages to measure recall and tune
-  the threshold. Missed entities are the failure that matters.
+**Windowing.** A window now ends at a paragraph break if one falls in its last
+quarter, else at a sentence end. Windows still overlap by 40 words.
+
+**Measurement.** `tests/eval/` holds labelled, invented legal passages, and
+`scripts/evaluate.py` reports what survives redaction:
+
+```
+.venv/bin/python scripts/evaluate.py -v                  # tuning set, list misses
+.venv/bin/python scripts/evaluate.py -f holdout.json -v  # second set
+.venv/bin/python scripts/evaluate.py -t 0.2 0.3 0.4 0.5  # compare thresholds
+```
+
+| Set | Passages | Labelled mentions | Sensitive characters redacted | Mentions leaked | Over-redactions |
+|---|---|---|---|---|---|
+| `passages.json`, before fixes (threshold 0.4) | 16 | 230 | 89.0% | 34 | 7 |
+| `passages.json`, after fixes | 16 | 230 | 100% | 0 | 0 |
+| `holdout.json`, first run, unseen | 10 | 184 | 90.2% | 24 | 8 |
+| `holdout.json`, after a second round of fixes | 10 | 184 | 99.5% | 3 | 1 |
+
+How to read this: **90% is the honest figure for text the rules have never
+seen**, and it was measured before the second round of fixes. Both sets have
+now been used for tuning, so the 99-100% rows show the fixes work on these
+passages, not what to expect on a new document. A fresh held-out set is needed
+to measure again. All passages were written by a model, not taken from real
+filings, so real documents will be messier.
+
+**What the fixes were.** All are general rules, none are specific to a passage:
+
+- Threshold lowered from 0.4 to 0.3 (fewer misses, no extra false hits on the
+  tuning set; 0.2 started tagging job titles and "STATE OF FLORIDA").
+- Short forms of known names are tagged wherever they appear as whole words:
+  surname, first name, surname with particles ("van der Meer"), a company's
+  leading words ("Cedar Ridge" from "Cedar Ridge Properties LLC"), and the
+  title-case form of an ALL-CAPS name.
+- New regexes: "City, State 12345" lines (two-letter or spelled-out state,
+  Canadian postal codes), firm names ending in Associates/Partners/Group/
+  Holdings, law-firm lists ("A, B & C PC"), account numbers introduced loosely
+  ("account at First Bank, number ..."; "ending in 4410"), labelled IDs (MRN,
+  member, policy, licence, passport numbers), and ITINs (9xx-xx-xxxx).
+- Filters: capitalised defined terms ("Employee", "the Borrower", "Claimant"),
+  courts, and descriptions like "Delaware corporation" are not names.
+
+**Still missed**
+
+- Nicknames that are not part of the full name ("Gerry" for Gerard, "Seun" for
+  Oluwaseun). Nothing ties them to the person except context.
+- A country name trailing an address (", Canada").
+- Anything the model misses that has no full form elsewhere to propagate from.
+
+**Costs of the new rules**
+
+- First-name propagation means a person named Will, Grant or Mark also redacts
+  that ordinary word when capitalised. Round-trip stays exact.
+- A company's first word is redacted on its own ("Orion" from "Orion Tools
+  Corp."), except for a short list of generic words (First, National, United...).
+- Organisations that are not parties ("American Arbitration Association") are
+  redacted like any other company.
 
 ## Step 4: vault hardening and CLI
 

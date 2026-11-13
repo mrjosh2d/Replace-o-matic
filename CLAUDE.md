@@ -23,6 +23,9 @@ design decisions and known limits. Update its status table when a step lands.
   ```
 - Unit tests use a stub NER and need no model. Tests that load the real GLiNER
   model are marked `model` and skip when the model is absent.
+- After any change to detection, run `.venv/bin/python scripts/evaluate.py -v` and
+  `-f holdout.json -v` and compare with the table in `PLAN.md`. Both sets have
+  been tuned against; treat their scores as regression checks, not accuracy.
 - NER backend: the `gliner` package on its ONNX backend (decided; it brings
   PyTorch as a dependency, which is accepted).
 

@@ -68,17 +68,18 @@ _E = r"(?![\w-])"  # not followed by one
 # Company legal suffixes, matched in any case ("LLC", "Corporation", "INC.").
 _CO_SUFFIX = (
     r"(?i:LLP|LLC|L\.L\.C\.|L\.L\.P\.|PLLC|Inc\.|Inc|Incorporated|Corp\.|Corp|Corporation"
-    r"|Ltd\.|Ltd|Limited|L\.P\.|LP|PLC|P\.C\.|N\.A\.|GmbH)"
+    r"|Ltd\.|Ltd|Limited|L\.P\.|LP|PLC|P\.C\.|PC|P\.A\.|N\.A\.|GmbH)"
 )
 _CO_WORD = r"[A-Z][\w'’.-]*"
+_FIRM_NAME = r"(?!(?:Esq|Jr|Sr|Inc|LLC|LLP)\b)[A-Z][\w'’-]*"
 # Words that end a firm's name without being a legal suffix: "Zhang & Associates".
 _CO_KIND = r"(?:Associates|Partners|Holdings|Group|ASSOCIATES|PARTNERS|HOLDINGS|GROUP)"
 
 # (entity type, pattern). If the pattern has a group named "v", only that
 # group is the sensitive value; otherwise the whole match is.
 REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    # SSN: 123-45-6789
-    ("financial_id", re.compile(_B + r"(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}" + _E)),
+    # SSN or ITIN (ITINs start with 9): 123-45-6789
+    ("financial_id", re.compile(_B + r"(?!000|666)\d{3}-(?!00)\d{2}-(?!0000)\d{4}" + _E)),
     # EIN: 12-3456789
     ("financial_id", re.compile(_B + r"\d{2}-\d{7}" + _E)),
     # Bank account / routing number, anchored on a keyword to limit false positives
@@ -90,15 +91,41 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             re.IGNORECASE,
         ),
     ),
+    # "account at First Bank, number 123456", "savings account ending in 4410"
+    (
+        "financial_id",
+        re.compile(
+            r"\baccount\b[^.;\n]{0,60}?\b(?:no\.|no\b|number|ending[ \t]+in)\s*[:#]?\s*"
+            r"(?P<v>\d(?:[ -]?\d){3,16})" + _E,
+            re.IGNORECASE,
+        ),
+    ),
+    # Other labelled identifiers: medical record, member, policy, licence, passport numbers
+    (
+        "financial_id",
+        re.compile(
+            r"\b(?:MRN|(?:Member|Patient|Policy|License|Passport|Taxpayer)[ \t]+(?:ID|No\.?|Number))"
+            r"\s*[:#]?\s*(?P<v>[A-Z]{1,5}[- ]?\d[\d-]{3,}\d|\d[\d-]{4,}\d)" + _E
+        ),
+    ),
     # IBAN
     ("financial_id", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?\b")),
     # Capitalised words ending in a legal suffix: "Smithson & Johnson LLP", "Acme, Inc."
     (
         "company",
         re.compile(
-            _B + _CO_WORD + r"(?:,?[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,5}?,?[ \t]+"
+            _B + _CO_WORD + r"(?:[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,5}?,?[ \t]+"
             + r"(?=[A-Z])"  # "a Delaware limited liability company" is not a name
-            + _CO_SUFFIX + r"(?!\w)"
+            + _CO_SUFFIX + r"(?!\w)(?![ \t]+(?:Law|Act|Code)\b)"  # "General Corporation Law"
+        ),
+    ),
+    # Law-firm lists: "Oyelaran, Schmidt & Lindqvist PC". Each listed name is one
+    # word, and "Esq."/"Jr." may not be one, so a preceding person is not swallowed.
+    (
+        "company",
+        re.compile(
+            _B + _FIRM_NAME + r"(?:,[ \t]+" + _FIRM_NAME + r")+,?[ \t]+&[ \t]+" + _CO_WORD
+            + r"(?:[ \t]+" + _CO_WORD + r"){0,2}?,?[ \t]+(?=[A-Z])" + _CO_SUFFIX + r"(?!\w)"
         ),
     ),
     (
@@ -111,7 +138,9 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "address",
         re.compile(
-            _B + r"(?:[A-Z][a-z]+\.?[ \t]+){0,2}[A-Z][a-z]+,[ \t]+[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?" + _E
+            _B + r"(?:[A-Z][a-z]+\.?[ \t]+){0,2}[A-Z][a-z]+,[ \t]+"
+            r"(?:[A-Z]{2}|[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)?)[ \t]+"  # OH, Ohio, New York
+            r"(?:\d{5}(?:-\d{4})?|[A-Z]\d[A-Z][ \t]?\d[A-Z]\d)" + _E  # US zip or Canadian code
         ),
     ),
     ("email", re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")),
@@ -275,11 +304,13 @@ _COMPANY_SUFFIXES = {
 }  # fmt: skip
 _HONORIFICS = {"mr", "mrs", "ms", "miss", "mx", "dr", "prof", "hon", "judge", "justice"}
 _NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "esq", "phd", "md"}
+_NAME_PARTICLES = {"van", "von", "der", "den", "de", "del", "della", "di", "da", "dos", "la", "le", "bin", "ibn", "al", "el", "ter", "ten"}
 
 # Role words that contracts capitalise as defined terms. NER models tag them as
 # people or companies, but they identify nobody.
 _DEFINED_TERMS = {
-    "affiant", "agent", "assignee", "assignor", "borrower", "buyer", "client", "company",
+    "affiant", "agent", "assignee", "assignor", "borrower", "buyer", "claimant", "client",
+    "company", "declarant", "owner", "patient", "principal", "shareholder", "shareholders",
     "contractor", "consultant", "corporation", "counsel", "court", "customer", "debtor",
     "defendant", "deponent", "discloser", "employee", "employer", "executor", "firm",
     "grantee", "grantor", "guarantor", "holder", "landlord", "lender", "lessee", "lessor",
@@ -464,6 +495,8 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
                 continue  # "Employee", "the Borrower"
             if d.type == "company" and re.search(r"\bCourt\b", bare):
                 continue  # courts are public bodies, not parties
+            if d.type == "company" and re.search(r"\b(?:corporation|company|partnership)$", bare):
+                continue  # "Delaware corporation" describes an entity, it does not name one
         cleaned.append(Detection(start, end, d.type, d.source, d.alias_of))
 
     kept: list[Detection] = []
@@ -499,7 +532,16 @@ def _short_forms(etype: str, value: str) -> list[str]:
         if len(words) < 2:
             return []
         # Surname and first name; initials and two-letter tokens are skipped.
-        return [w for w in (words[-1], words[0]) if len(w) >= 3 and w[0].isupper()]
+        forms = [w for w in (words[-1], words[0]) if len(w) >= 3 and w[0].isupper()]
+        # "Pieter van der Meer" is later "Mr. van der Meer", not "Mr. Meer".
+        k = len(words) - 1
+        while k > 1 and words[k - 1].casefold() in _NAME_PARTICLES:
+            k -= 1
+        if k < len(words) - 1:
+            m = re.search(r"\b" + r"\W+".join(map(re.escape, words[k:])), value)
+            if m:
+                forms.insert(0, m.group(0))
+        return forms
     if etype == "company":
         core = re.sub(
             r"(?:[,\s]+(?:&\s+)?(?:" + _CO_SUFFIX + "|" + _CO_KIND + r"))+$", "", value
@@ -519,6 +561,13 @@ def _short_forms(etype: str, value: str) -> list[str]:
     return []
 
 
+def _short_forms_any_case(etype: str, value: str) -> list[str]:
+    """Short forms, plus title-case versions for names given in capitals:
+    "PINNACLE TITLE & ESCROW, INC." in a signature block is "Pinnacle" in the body."""
+    forms = _short_forms(etype, value)
+    return forms + [f.title() for f in forms if f.isupper() and f.title() != f]
+
+
 def _propagate(text: str, known: Iterable[tuple[str, str]]) -> list[Detection]:
     """Tag short forms of known names that the model missed.
 
@@ -528,7 +577,7 @@ def _propagate(text: str, known: Iterable[tuple[str, str]]) -> list[Detection]:
     """
     parents: dict[tuple[str, str], set[str]] = {}
     for etype, value in known:
-        for short in _short_forms(etype, value):
+        for short in _short_forms_any_case(etype, value):
             parents.setdefault((etype, short), set()).add(value)
 
     extra = []
