@@ -79,6 +79,53 @@ def test_regex_ignores_lookalikes(text):
     assert detect_regex(text) == []
 
 
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("Counsel Mary Smithson of Smithson & Johnson LLP appeared.", "Smithson & Johnson LLP"),
+        ("ACME CORPORATION and Beta Holdings LLC agree.", "ACME CORPORATION"),
+        ("ACME CORPORATION and Beta Holdings LLC agree.", "Beta Holdings LLC"),
+        ("Payment to Acme, Inc. is due.", "Acme, Inc."),
+        ("Notices go to First Bank, N.A. promptly.", "First Bank, N.A."),
+    ],
+)
+def test_regex_detects_companies_by_legal_suffix(text, expected):
+    hits = [text[d.start : d.end] for d in detect_regex(text) if d.type == "company"]
+    assert expected in hits
+
+
+def test_bare_surname_and_short_company_name_are_caught_without_the_model_seeing_them():
+    text = "John A. Smith sued Acme Corporation. Later Smith settled; Acme's insurer paid. Smithfield and Acmeville were not involved."
+    proposal = scan_text(text, ner=fake_ner(person=["John A. Smith"]))
+    assert values(proposal) == {
+        "[PERSON_1]": "John A. Smith",
+        "[COMPANY_1]": "Acme Corporation",
+        "[PERSON_1_ALIAS_1]": "Smith",
+        "[COMPANY_1_ALIAS_1]": "Acme",
+    }
+    vault = merge_vault(None, proposal["proposed"])
+    safe = apply_vault(text, vault)
+    assert safe.endswith("Smithfield and Acmeville were not involved.")
+    assert rehydrate_text(safe, vault) == text
+
+
+def test_surname_of_a_person_already_in_the_vault_is_caught_in_a_new_document():
+    vault = build_vault("Jane Q. Doe", person=["Jane Q. Doe"])
+    proposal = scan_text("Doe did not appear.", vault, ner=False)
+    assert values(proposal) == {"[PERSON_1_ALIAS_1]": "Doe"}
+
+
+def test_adjacent_address_parts_merge_into_one_address():
+    text = "residing at 742 Evergreen Terrace, Springfield, IL 62704, and"
+    proposal = scan_text(text, ner=fake_ner(address=["742 Evergreen Terrace", "Springfield, IL 62704"]))
+    assert values(proposal) == {"[ADDRESS_1]": "742 Evergreen Terrace, Springfield, IL 62704"}
+
+
+def test_ssn_and_ein_with_the_same_digits_are_different_ids():
+    proposal = scan_text("EIN 12-3456789 and SSN 123-45-6789", ner=False)
+    assert set(proposal["proposed"]) == {"[FINANCIAL_ID_1]", "[FINANCIAL_ID_2]"}
+
+
 def test_ssn_is_not_also_a_phone_or_ein():
     proposal = scan_text("SSN 123-45-6789", ner=False)
     assert values(proposal) == {"[FINANCIAL_ID_1]": "123-45-6789"}

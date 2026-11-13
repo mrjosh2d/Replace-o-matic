@@ -64,6 +64,13 @@ NerDetector = Callable[[str], Iterable[Detection]]
 _B = r"(?<![\w-])"  # not preceded by a word char or hyphen
 _E = r"(?![\w-])"  # not followed by one
 
+# Company legal suffixes, matched in any case ("LLC", "Corporation", "INC.").
+_CO_SUFFIX = (
+    r"(?i:LLP|LLC|L\.L\.C\.|L\.L\.P\.|PLLC|Inc\.|Inc|Incorporated|Corp\.|Corp|Corporation"
+    r"|Ltd\.|Ltd|Limited|L\.P\.|LP|PLC|P\.C\.|N\.A\.|GmbH)"
+)
+_CO_WORD = r"[A-Z][\w'’.-]*"
+
 # (entity type, pattern). If the pattern has a group named "v", only that
 # group is the sensitive value; otherwise the whole match is.
 REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -82,6 +89,14 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
     # IBAN
     ("financial_id", re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?\b")),
+    # Capitalised words ending in a legal suffix: "Smithson & Johnson LLP", "Acme, Inc."
+    (
+        "company",
+        re.compile(
+            _B + _CO_WORD + r"(?:,?[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,5}?,?[ \t]+"
+            + _CO_SUFFIX + r"(?!\w)"
+        ),
+    ),
     ("email", re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")),
     # US phone: (212) 555-0147, 212-555-0147, +1 212.555.0147
     (
@@ -94,7 +109,8 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 
 def detect_regex(text: str) -> list[Detection]:
-    """Find SSNs, EINs, bank account numbers, IBANs, emails and phone numbers."""
+    """Find SSNs, EINs, bank account numbers, IBANs, suffixed company names,
+    emails and phone numbers."""
     found = []
     for etype, pattern in REGEX_PATTERNS:
         for m in pattern.finditer(text):
@@ -270,7 +286,8 @@ def _generic_key(etype: str, value: str) -> str:
         digits = re.sub(r"\D", "", value)
         return digits[1:] if len(digits) == 11 and digits[0] == "1" else digits
     if etype == "financial_id":
-        return re.sub(r"[^0-9a-z]", "", value.casefold())
+        # Keep hyphens: SSN 123-45-6789 and EIN 12-3456789 are different numbers.
+        return re.sub(r"\s", "", value.casefold())
     return " ".join(_words(value))  # address
 
 
@@ -390,7 +407,53 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
     for d in by_priority:
         if all(d.end <= k.start or d.start >= k.end for k in kept):
             kept.append(d)
-    return sorted(kept, key=lambda d: d.start)
+    kept.sort(key=lambda d: d.start)
+
+    # "742 Evergreen Terrace" + ", " + "Springfield, IL 62704" is one address.
+    merged: list[Detection] = []
+    for d in kept:
+        prev = merged[-1] if merged else None
+        if (
+            prev
+            and prev.type == d.type == "address"
+            and re.fullmatch(r",?[ \t]*\n?[ \t]*", text[prev.end : d.start])
+        ):
+            merged[-1] = Detection(prev.start, d.end, "address", prev.source)
+        else:
+            merged.append(d)
+    return merged
+
+
+def _short_forms(etype: str, value: str) -> list[str]:
+    """Shorter names a known entity is likely to be called by elsewhere in a text."""
+    if etype == "person":
+        words = re.findall(r"[\w'’-]+", value)
+        while len(words) > 1 and words[-1].casefold().rstrip(".") in _NAME_SUFFIXES:
+            words.pop()
+        surname = words[-1] if len(words) > 1 else ""
+        return [surname] if len(surname) >= 3 and surname[0].isupper() else []
+    if etype == "company":
+        core = re.sub(r"(?:[,\s]+" + _CO_SUFFIX + r")+$", "", value)
+        return [core] if core != value and len(core) >= 3 else []
+    return []
+
+
+def _propagate(text: str, spans: list[Detection], known: Iterable[tuple[str, str]]) -> list[Detection]:
+    """Tag bare surnames and suffix-less company names that the model missed.
+
+    NER models are confident about "John A. Smith" and "Acme Corporation" but
+    often skip a later bare "Smith" or "Acme". ``known`` is (type, value) pairs.
+    """
+    extra = []
+    seen = set()
+    for etype, value in known:
+        for short in _short_forms(etype, value):
+            if (etype, short) in seen:
+                continue
+            seen.add((etype, short))
+            for m in re.finditer(r"(?<!\w)" + re.escape(short) + r"(?!\w)", text):
+                extra.append(Detection(m.start(), m.end(), etype, "propagated"))
+    return extra
 
 
 def scan_text(
@@ -438,9 +501,14 @@ def scan_text(
     if ner:
         detections.extend(ner(text))
 
+    spans = _clean_spans(text, detections)
+    known = [(e["type"], e["value"]) for e in _mappings(existing_vault).values()]
+    known += [(d.type, text[d.start : d.end]) for d in spans]
+    spans = _clean_spans(text, spans + _propagate(text, spans, known))
+
     proposed: dict[str, dict] = {}
     matched: list[str] = []
-    for d in _clean_spans(text, detections):
+    for d in spans:
         value = text[d.start : d.end]
         if value in value_to_placeholder:
             placeholder = value_to_placeholder[value]

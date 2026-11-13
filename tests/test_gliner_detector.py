@@ -95,19 +95,17 @@ def test_real_model_end_to_end_without_network(monkeypatch):
         raise AssertionError("network access attempted")
 
     monkeypatch.setattr(socket.socket, "connect", no_network)
-    text = (
-        "This Agreement is between John Smith, residing at 742 Evergreen Terrace, "
-        "Springfield, IL 62704, and Acme Corporation. Mr. Smith's SSN is 123-45-6789."
-    )
-    proposal = scan_text(text)
-    by_type = {}
-    for entry in proposal["proposed"].values():
-        by_type.setdefault(entry["type"], []).append(entry["value"])
-    assert any("Smith" in v for v in by_type.get("person", []))
-    assert any("Acme" in v for v in by_type.get("company", []))
-    assert by_type.get("financial_id") == ["123-45-6789"]
+    from test_sanitizer_core import DOCUMENT
 
+    proposal = scan_text(DOCUMENT)
     vault = merge_vault(None, proposal["proposed"])
-    safe = apply_vault(text, vault)
-    assert "John Smith" not in safe and "Acme" not in safe and "123-45-6789" not in safe
-    assert rehydrate_text(safe, vault) == text
+    safe = apply_vault(DOCUMENT, vault)
+    for leak in ("Smith", "Johnson", "Acme", "ACME", "Evergreen", "Springfield", "6789", "555-0147", "021000021", "@"):
+        assert leak not in safe, leak
+    assert rehydrate_text(safe, vault) == DOCUMENT
+
+    entity_of = {e["value"]: e["entity"] for e in vault["mappings"].values()}
+    assert entity_of["John A. Smith"] == entity_of["Smith"]
+    assert entity_of["Mary Smithson"] != entity_of["Smith"]
+    assert entity_of["Acme Corporation"] == entity_of["Acme"]
+    assert entity_of["Acme Holdings LLC"] != entity_of["Acme Corporation"]

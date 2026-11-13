@@ -9,7 +9,7 @@ machine, and swapped back afterwards using a local JSON vault.
 | Step | What | Status |
 |---|---|---|
 | 1 | Deterministic core: vault, regex detectors, `scan_text`, `apply_vault`, `rehydrate_text`, alias linking, pytest suite | **Done** |
-| 2 | GLiNER (ONNX) detector plugged into `scan_text`; offline model provisioning | **Code done; not yet run against the real model** |
+| 2 | GLiNER (ONNX) detector plugged into `scan_text`; offline model provisioning; surname and company-name propagation | **Done** |
 | 3 | Long-document handling and detection quality | Planned |
 | 4 | Vault hardening and a CLI | Planned |
 
@@ -65,7 +65,7 @@ uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requi
 - If an LLM rewrites a placeholder (`[person_1]`, `PERSON 1`), re-hydration will
   not recognise it.
 
-## Step 2: GLiNER detector (code done, real-model run pending)
+## Step 2: GLiNER detector (done)
 
 - `GlinerDetector` in `sanitizer_core.py`: labels `person`, `company`,
   `organization` (mapped to company), `address`; score threshold 0.4.
@@ -82,12 +82,25 @@ uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requi
   a fake model, plus one real-model test (marked `model`) that also blocks
   sockets to prove inference is offline. It skips until the model is present.
 
-Still to do, once huggingface.co is reachable from the dev environment:
+Verified against the real model (`gliner_small-v2.1`, 611 MB ONNX file, about
+8 s to load and 0.2 s per window on CPU): the sample agreement in the tests is
+fully redacted and round-trips exactly, with sockets blocked.
 
-1. Run `python scripts/fetch_model.py`, then `pytest -m model`.
-2. Confirm the model repo's file layout matches what the loader expects
-   (`onnx/model.onnx` plus config and tokenizer files), and adjust if not.
-3. Sanity-check the 0.4 threshold on a few realistic passages.
+That first real run showed what the model misses, and three fixes went in:
+
+- **Bare surnames and short company names.** The model scored "John A. Smith"
+  at 0.95 but a later bare "Smith" at 0.27, below the threshold. Now, once a full
+  name or a suffixed company name is known (from this text or the vault), every
+  whole-word occurrence of the surname or the suffix-less company name is tagged.
+- **Companies with a legal suffix** ("Smithson & Johnson LLP") are also caught
+  by regex, since the model missed that one entirely.
+- **Address parts** the model returns separately (street; city, state, zip) are
+  merged into one address when they are adjacent.
+
+Also fixed: an SSN and an EIN with the same digits were treated as one ID.
+
+Downloading needs these hosts: `huggingface.co` and `us.aws.cdn.hf.co` (the CDN
+that serves the large files).
 
 The `gliner` package was chosen over driving `onnxruntime` directly. It brings
 PyTorch along (the venv is about 5.5 GB), which is accepted.
@@ -95,7 +108,7 @@ PyTorch along (the venv is about 5.5 GB), which is accepted.
 ## Step 3: long documents and quality
 
 - Smarter chunking: break windows at paragraph or sentence boundaries.
-- Propagation: once a name is detected anywhere, tag every other occurrence.
+- First-name-only references ("John said") are not propagated; decide whether they should be.
 - A small labelled set of realistic legal passages to measure recall and tune
   the threshold. Missed entities are the failure that matters.
 
