@@ -13,7 +13,7 @@ machine, and swapped back afterwards using a local JSON vault.
 | 3 | Long-document handling and detection quality: labelled passages, measurement script, gap fixes | **Done** |
 | 4 | Human review, "I'm feeling lucky", encrypted vault, command-line tool, .docx/PDF input | **Done** |
 | 5 | .docx in, .docx out with formatting kept; headers, footers, footnotes, endnotes, comments | **Done** |
-| 6 | Labelled measurement on real documents; tolerate altered placeholders | Planned |
+| 6 | Labelled measurement on real documents | Draft labels with the owner for correction |
 
 ## Step 1: deterministic core (done)
 
@@ -296,8 +296,37 @@ Limits:
   touched. Field codes and hyperlink targets are not touched, only visible text.
 - Not opened in Microsoft Word here; only LibreOffice was available.
 
-## Step 6: next
+## Step 6: labelled measurement on real documents (draft labels out for review)
 
-- Label a few real documents and measure recall on them properly.
+Draft labels for the five sample documents were produced without using the
+tool's own decisions:
+
+1. Candidates per document: everything the raw model flags at threshold 0.15
+   (no filters), every regex hit, every capitalised phrase and every long
+   number. 3,651 distinct candidates.
+2. Three subagents classified them as sensitive or not, working from the
+   candidate lists only.
+3. Rows that merely contain a shorter sensitive row plus ordinary words
+   ("John Doe's Social Security Number") were dropped, leaving 88 labels.
+
+The label sheets hold text from the sample documents, so they are kept out of
+the repository. `scripts/evaluate_labels.py` scores the tool against a
+corrected sheet.
+
+Against the **uncorrected draft**: 79 of 88 labels fully caught. Not a result
+to quote until the labels are reviewed; several of the nine are labelling
+questions, not leaks. What the draft already shows:
+
+- **Web addresses are not detected** (`www.AFT.com`). Real gap.
+- **A middle name can survive**: "Chester Alan Arthur" is redacted as surname
+  and first name, leaving "Alan". Real gap, small.
+- For the reviewer to decide: a firm's tagline, vendors mentioned in passing
+  ("The Depository Trust Company"), and generic titles ("REVOCABLE FAMILY
+  WEALTH TRUST", "U.S. Bank as Trustee").
+
+Next: apply the corrected labels, record the figures, then fix the gaps.
+
+## Later
+
 - Tolerate placeholders an LLM has altered (`[person_1]`, `PERSON 1`).
 - Redacted PDF output (today a PDF comes back as plain text).
