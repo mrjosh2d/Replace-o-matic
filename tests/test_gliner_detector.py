@@ -174,3 +174,40 @@ def test_recall_on_labelled_passages_does_not_regress():
     stats, leaks, extras = evaluate(load_eval("passages.json"), sanitizer_core.default_detector())
     assert stats["hit_chars"] / stats["gold_chars"] >= 0.99, leaks
     assert len(extras) <= 3, extras
+
+
+def test_offline_switches_are_set_on_import():
+    for name in ("ORT_DISABLE_TELEMETRY", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
+        assert os.environ.get(name) == "1", name
+
+
+@pytest.mark.model
+@needs_model
+def test_real_scan_opens_no_network_connection_at_os_level(tmp_path):
+    """Watches the whole process tree with strace, so native libraries count too.
+    (onnxruntime's built-in telemetry was caught this way; Python-level socket
+    patching cannot see it.)"""
+    import shutil
+    import subprocess
+    import sys
+
+    if not shutil.which("strace"):
+        pytest.skip("strace not installed")
+    root = os.path.join(os.path.dirname(__file__), "..")
+    script = (
+        "import time, sanitizer_core as sc\n"
+        "p = sc.scan_text('John Smith of Acme Corporation, 12 Oak Street, Akron, OH 44301. ' * 20)\n"
+        "assert p['proposed']\n"
+        "time.sleep(6)\n"  # telemetry is sent from a background thread a few seconds in
+    )
+    log = tmp_path / "trace.log"
+    env = {k: v for k, v in os.environ.items() if k not in sanitizer_core._OFFLINE_ENV}
+    result = subprocess.run(
+        ["strace", "-f", "-qq", "-e", "trace=connect", "-o", str(log), sys.executable, "-W", "ignore", "-c", script],
+        cwd=root, env=env, capture_output=True, text=True, timeout=300,
+    )  # fmt: skip
+    if "ptrace" in result.stderr.lower() or "operation not permitted" in result.stderr.lower():
+        pytest.skip("strace is not permitted here")
+    assert result.returncode == 0, result.stderr[-2000:]
+    outbound = [line for line in log.read_text().splitlines() if "AF_INET" in line]
+    assert outbound == [], outbound[:5]

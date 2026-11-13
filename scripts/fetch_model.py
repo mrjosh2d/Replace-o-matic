@@ -23,6 +23,7 @@ def main() -> None:
     args = parser.parse_args()
 
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    os.environ["DO_NOT_TRACK"] = "1"
     from huggingface_hub import snapshot_download
 
     snapshot_download(

@@ -9,8 +9,13 @@ design decisions and known limits. Update its status table when a step lands.
   imports at runtime must make no network calls. Downloading model weights from
   huggingface.co is allowed, as a separate, deliberate setup step. Nothing is
   ever uploaded.
+  - Third-party libraries can phone home on their own: `onnxruntime` did (usage
+    telemetry). `sanitizer_core` sets `ORT_DISABLE_TELEMETRY=1` on import; keep
+    it the first project import. After adding or upgrading any dependency, run
+    `pytest -m model`: one test traces the process with `strace` and fails on
+    any outbound connection.
 - **Never commit a vault or real client text.** Vaults hold the real names and
-  numbers (`*vault*.json` is gitignored). Test fixtures use invented data only.
+  numbers (`*vault*` and `*.sanitized.txt` / `*.rehydrated.txt` are gitignored). Test fixtures use invented data only.
 - **Round-trip must stay exact:** `rehydrate_text(apply_vault(t, v), v) == t`.
   Any change to matching or placeholders needs a test proving it.
 

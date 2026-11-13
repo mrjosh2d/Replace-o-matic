@@ -11,7 +11,8 @@ machine, and swapped back afterwards using a local JSON vault.
 | 1 | Deterministic core: vault, regex detectors, `scan_text`, `apply_vault`, `rehydrate_text`, alias linking, pytest suite | **Done** |
 | 2 | GLiNER (ONNX) detector plugged into `scan_text`; offline model provisioning; surname and company-name propagation | **Done** |
 | 3 | Long-document handling and detection quality: labelled passages, measurement script, gap fixes | **Done** |
-| 4 | Vault hardening and a CLI | Planned |
+| 4 | Human review, "I'm feeling lucky", encrypted vault, command-line tool, .docx/PDF input | **Done** |
+| 5 | Redacted .docx output that keeps formatting; fresh labelled measurement on real documents | Planned |
 
 ## Step 1: deterministic core (done)
 
@@ -208,8 +209,64 @@ will be dropped unless a regex catches them. Review is the backstop.
   capitalised trust types ("Charitable Lead Trust"). These are for the reviewer
   to decline.
 
-## Step 4: vault hardening and CLI
+## Step 4: review, encryption and the command-line tool (done)
 
-- Encrypt the vault at rest.
-- CLI: `scan`, `review`, `apply`, `rehydrate`.
-- Post-apply leak check: fail if any vault value is still present in the output.
+```
+.venv/bin/python sanitizer_cli.py sanitize contract.docx --vault matter.vault
+.venv/bin/python sanitizer_cli.py sanitize contract.docx --vault matter.vault --lucky
+.venv/bin/python sanitizer_cli.py rehydrate answer.txt --vault matter.vault
+.venv/bin/python sanitizer_cli.py vault --vault matter.vault [--show-values]
+```
+
+**Review.** `sanitize` scans, then shows each new item with its type, how often
+it appears and a snippet of context. For each one: accept, decline, edit the
+text to redact, change its type, or accept all the rest. Afterwards the
+reviewer can type in anything the scan missed (it must appear in the document).
+Quitting saves nothing. Declined values are remembered in the vault and not
+proposed again for that matter.
+
+**"I'm feeling lucky."** Offered as the second choice at the first prompt, and
+as `--lucky`. It accepts everything the scan found with no review. The items
+are marked `"reviewed": false` in the vault, `vault` reports how many there
+are, and the run ends with a warning that the scan misses things.
+
+**Encryption.** The vault file is AES-256-GCM, with the key derived from a
+passphrase by scrypt. A wrong passphrase or a tampered file is refused. The
+command-line tool will not use a plaintext vault. The passphrase is asked for
+each time, or read from `REPLACE_O_MATIC_PASSPHRASE` for scripted use.
+Changing to an operating-system keychain later is small: `save_vault` and
+`load_vault` already accept a raw `key=` in place of a passphrase, and the
+file format is the same.
+
+**File formats.** Reads .txt, .docx (body text and tables; not headers,
+footers or footnotes) and text PDFs. Writes plain text. A PDF's line breaks
+can fall inside a name, which then becomes a separate vault entry.
+
+**Checks on every run.** Round-trip is verified before the output is written.
+Vault values that still appear in a different letter case are listed.
+
+### Telemetry in onnxruntime (found and blocked)
+
+Running the tool showed `onnxruntime` 1.31 trying to contact a Microsoft
+telemetry server (`mobile.events.data.microsoft.com`) a few seconds after the
+model loads. It is usage telemetry built into the library, not document text,
+but it is a network call at runtime and breaks the first hard rule.
+
+- `sanitizer_core` now sets `ORT_DISABLE_TELEMETRY=1` when it is imported, before
+  any model library loads. That switch stops it; calling
+  `disable_telemetry_events()` after import does not.
+- If `onnxruntime` was already imported without the switch, loading the model
+  raises an error.
+- A test traces the whole process with `strace` during a real scan and fails on
+  any outbound connection. The earlier "offline" test only patched Python's
+  sockets and could not see a native library, which is why this was missed.
+- In this project's sandbox every attempt was refused by the network proxy, so
+  nothing was sent. Anyone who ran an earlier commit on an open network would
+  have sent onnxruntime's usage telemetry.
+
+## Step 5: next
+
+- Write a redacted .docx that keeps the original formatting.
+- Read .docx headers, footers and footnotes.
+- Label a few real documents and measure recall on them properly.
+- Tolerate placeholders an LLM has altered (`[person_1]`, `PERSON 1`).

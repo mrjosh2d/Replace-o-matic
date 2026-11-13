@@ -18,6 +18,10 @@ Every distinct surface form gets its own placeholder, so re-hydration is exact.
 Aliases of one real-world entity share the entity number, so a reader (or an
 LLM) can still tell that ``[COMPANY_1]`` and ``[COMPANY_1_ALIAS_1]`` co-refer.
 
+A vault may also carry ``"declined"``: values a reviewer said are not
+sensitive, which are not proposed again. On disk the vault is encrypted with a
+passphrase (see :func:`save_vault`).
+
 This module makes no network calls: the GLiNER model is loaded from a local
 directory only (see ``scripts/fetch_model.py`` for the one-time download) and
 the Hugging Face libraries are forced into offline mode. The vault holds the real values in
@@ -26,13 +30,30 @@ plaintext: never commit it, and never send it anywhere with the sanitized text.
 
 from __future__ import annotations
 
+import base64
 import copy
+import hashlib
 import json
 import os
 import re
+import sys
 import tempfile
 from dataclasses import dataclass
 from typing import Callable, Iterable
+
+# Offline switches, set before any model library can be imported.
+# onnxruntime (1.3x) starts usage telemetry to a Microsoft server as soon as it
+# is imported; ORT_DISABLE_TELEMETRY is the only switch that reliably stops it,
+# and only if set first. The Hugging Face libraries are told never to go online.
+_OFFLINE_ENV = {
+    "ORT_DISABLE_TELEMETRY": "1",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+    "DO_NOT_TRACK": "1",
+}
+_ORT_IMPORTED_UNGUARDED = "onnxruntime" in sys.modules and os.environ.get("ORT_DISABLE_TELEMETRY") != "1"
+os.environ.update(_OFFLINE_ENV)
 
 VAULT_VERSION = 1
 
@@ -244,10 +265,12 @@ class GlinerDetector:
                 "while online, or set SANITIZER_MODEL_DIR. To scan with regex patterns "
                 "only, pass ner=False."
             )
-        # Must be set before the Hugging Face libraries are imported.
-        os.environ["HF_HUB_OFFLINE"] = "1"
-        os.environ["TRANSFORMERS_OFFLINE"] = "1"
-        os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+        if _ORT_IMPORTED_UNGUARDED:
+            raise RuntimeError(
+                "onnxruntime was imported before sanitizer_core, with its telemetry enabled. "
+                "Import sanitizer_core first, or set ORT_DISABLE_TELEMETRY=1 in the environment."
+            )
+        os.environ.update(_OFFLINE_ENV)
         from gliner import GLiNER
 
         return GLiNER.from_pretrained(
@@ -515,39 +538,122 @@ def _value_index(vault: dict | None) -> dict[str, str]:
     return index
 
 
-def merge_vault(vault: dict | None, proposed: dict[str, dict]) -> dict:
-    """Return a new vault with ``proposed`` mappings added. Inputs are not modified."""
+def merge_vault(
+    vault: dict | None, proposed: dict[str, dict], declined: Iterable[str] = ()
+) -> dict:
+    """Return a new vault with ``proposed`` mappings added. Inputs are not modified.
+
+    ``declined`` values (things a reviewer said are not sensitive) are
+    remembered, so later scans against this vault do not propose them again.
+    """
     merged = copy.deepcopy(vault) if vault else new_vault()
     for placeholder, entry in proposed.items():
         existing = merged["mappings"].get(placeholder)
         if existing is not None and existing["value"] != entry["value"]:
             raise ValueError(f"{placeholder} is already mapped to a different value")
         merged["mappings"][placeholder] = dict(entry)
+    values = {e["value"] for e in merged["mappings"].values()}
+    remembered = [v for v in merged.get("declined", []) if v not in values]
+    remembered += [v for v in declined if v not in values and v not in remembered]
+    if remembered:
+        merged["declined"] = remembered
+    else:
+        merged.pop("declined", None)
     _value_index(merged)
     return merged
 
 
-def load_vault(path: str | os.PathLike) -> dict:
-    with open(path, encoding="utf-8") as fh:
-        vault = json.load(fh)
-    if vault.get("version") != VAULT_VERSION:
-        raise ValueError(f"Unsupported vault version: {vault.get('version')!r}")
-    _value_index(vault)
-    return vault
+class VaultError(RuntimeError):
+    """The vault could not be opened: wrong passphrase, or a damaged file."""
 
 
-def save_vault(vault: dict, path: str | os.PathLike) -> None:
-    """Write the vault atomically, readable by the owner only."""
-    _value_index(vault)
+ENCRYPTED_FORMAT = "replace-o-matic-encrypted-vault"
+_SCRYPT = {"n": 2**15, "r": 8, "p": 1}
+
+
+def derive_key(passphrase: str, salt: bytes, params: dict = _SCRYPT) -> bytes:
+    """Turn a passphrase into a 256-bit key (scrypt). The only place a
+    passphrase is used: any other source of a 32-byte key, such as an
+    operating-system keychain, can be passed to save/load as ``key=`` instead."""
+    return hashlib.scrypt(
+        passphrase.encode("utf-8"), salt=salt, dklen=32, maxmem=2**27,
+        n=params["n"], r=params["r"], p=params["p"],
+    )  # fmt: skip
+
+
+def _write_private(path: str | os.PathLike, data: str) -> None:
+    """Write atomically, readable by the owner only."""
     directory = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(dir=directory, prefix=".vault-", suffix=".tmp")  # mode 0600
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(vault, fh, indent=2, ensure_ascii=False)
+            fh.write(data)
         os.replace(tmp, path)
     except BaseException:
         os.unlink(tmp)
         raise
+
+
+def save_vault(
+    vault: dict,
+    path: str | os.PathLike,
+    passphrase: str | None = None,
+    key: bytes | None = None,
+) -> None:
+    """Write the vault. With a ``passphrase`` (or a raw 32-byte ``key``) the file
+    is encrypted with AES-256-GCM; with neither it is plain JSON, which is only
+    appropriate for tests and throwaway data."""
+    _value_index(vault)
+    plain = json.dumps(vault, indent=2, ensure_ascii=False)
+    if passphrase is None and key is None:
+        _write_private(path, plain)
+        return
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    b64 = lambda raw: base64.b64encode(raw).decode("ascii")
+    envelope: dict = {"format": ENCRYPTED_FORMAT, "version": VAULT_VERSION}
+    if key is None:
+        salt = os.urandom(16)
+        key = derive_key(passphrase, salt)
+        envelope["kdf"] = {"name": "scrypt", "salt": b64(salt), **_SCRYPT}
+    nonce = os.urandom(12)
+    envelope["cipher"] = "AES-256-GCM"
+    envelope["nonce"] = b64(nonce)
+    envelope["ciphertext"] = b64(AESGCM(key).encrypt(nonce, plain.encode("utf-8"), None))
+    _write_private(path, json.dumps(envelope, indent=2))
+
+
+def is_encrypted_vault(path: str | os.PathLike) -> bool:
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh).get("format") == ENCRYPTED_FORMAT
+
+
+def load_vault(
+    path: str | os.PathLike, passphrase: str | None = None, key: bytes | None = None
+) -> dict:
+    with open(path, encoding="utf-8") as fh:
+        vault = json.load(fh)
+    if vault.get("format") == ENCRYPTED_FORMAT:
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        if key is None:
+            if passphrase is None:
+                raise VaultError("This vault is encrypted: a passphrase is required.")
+            kdf = vault["kdf"]
+            key = derive_key(passphrase, base64.b64decode(kdf["salt"]), kdf)
+        try:
+            plain = AESGCM(key).decrypt(
+                base64.b64decode(vault["nonce"]), base64.b64decode(vault["ciphertext"]), None
+            )
+        except InvalidTag:
+            raise VaultError("Wrong passphrase, or the vault file is damaged.") from None
+        vault = json.loads(plain)
+    if vault.get("version") != VAULT_VERSION:
+        raise ValueError(f"Unsupported vault version: {vault.get('version')!r}")
+    _value_index(vault)
+    return vault
 
 
 # --------------------------------------------------------------------------
@@ -725,6 +831,64 @@ def _propagate(text: str, known: Iterable[tuple[str, str]]) -> list[Detection]:
     return extra
 
 
+def propose_mappings(
+    candidates: Iterable[tuple], existing_vault: dict | None = None
+) -> tuple[dict[str, dict], list[str]]:
+    """Assign placeholders to candidate values, in the order given.
+
+    Each candidate is ``(type, value)``, optionally followed by ``source`` and
+    ``alias_of``. Returns ``(proposed, matched)``: new mappings, and the
+    placeholders of candidates the vault already knows. Used by
+    :func:`scan_text`, and by review tools after a person has edited the list.
+    """
+    value_to_placeholder = _value_index(existing_vault)
+    entities: dict[str, dict] = {}  # entity id -> {"type", "values"}
+    for entry in _mappings(existing_vault).values():
+        entity = entities.setdefault(entry["entity"], {"type": entry["type"], "values": []})
+        entity["values"].append(entry["value"])
+
+    next_number = {t: 0 for t in ENTITY_TYPES}
+    next_alias: dict[str, int] = {}
+    for placeholder in _mappings(existing_vault):
+        etype, number, alias = re.fullmatch(
+            r"\[([A-Z_]+?)_(\d+)(?:_ALIAS_(\d+))?\]", placeholder
+        ).groups()
+        etype = etype.lower()
+        next_number[etype] = max(next_number[etype], int(number))
+        entity_id = f"{etype.upper()}_{number}"
+        next_alias[entity_id] = max(next_alias.get(entity_id, 0), int(alias or 0))
+
+    proposed: dict[str, dict] = {}
+    matched: list[str] = []
+    for etype, value, *rest in candidates:
+        source = rest[0] if rest else "manual"
+        alias_of = rest[1] if len(rest) > 1 else ""
+        if etype not in ENTITY_TYPES:
+            raise ValueError(f"Unknown entity type: {etype!r}")
+        if value in value_to_placeholder:
+            placeholder = value_to_placeholder[value]
+            if placeholder not in proposed and placeholder not in matched:
+                matched.append(placeholder)
+            continue
+
+        entity_id = _find_entity(etype, value, entities)
+        if entity_id is None and alias_of:
+            entity_id = next((eid for eid, e in entities.items() if alias_of in e["values"]), None)
+        if entity_id is None:
+            next_number[etype] += 1
+            entity_id = f"{etype.upper()}_{next_number[etype]}"
+            entities[entity_id] = {"type": etype, "values": []}
+            placeholder = f"[{entity_id}]"
+        else:
+            next_alias[entity_id] = next_alias.get(entity_id, 0) + 1
+            placeholder = f"[{entity_id}_ALIAS_{next_alias[entity_id]}]"
+
+        entities[entity_id]["values"].append(value)
+        value_to_placeholder[value] = placeholder
+        proposed[placeholder] = {"type": etype, "value": value, "entity": entity_id, "source": source}
+    return proposed, matched
+
+
 def scan_text(
     text: str,
     existing_vault: dict | None = None,
@@ -747,24 +911,8 @@ def scan_text(
     appearance (detected names first, then short forms derived from them),
     continuing from the highest number already in the vault.
     Pass the result's ``proposed`` dict to :func:`merge_vault` once reviewed.
+    Values listed under ``"declined"`` in the vault are not proposed again.
     """
-    value_to_placeholder = _value_index(existing_vault)
-    entities: dict[str, dict] = {}  # entity id -> {"type", "values"}
-    for entry in _mappings(existing_vault).values():
-        entity = entities.setdefault(entry["entity"], {"type": entry["type"], "values": []})
-        entity["values"].append(entry["value"])
-
-    next_number = {t: 0 for t in ENTITY_TYPES}
-    next_alias: dict[str, int] = {}
-    for placeholder in _mappings(existing_vault):
-        etype, number, alias = re.fullmatch(
-            r"\[([A-Z_]+?)_(\d+)(?:_ALIAS_(\d+))?\]", placeholder
-        ).groups()
-        etype = etype.lower()
-        next_number[etype] = max(next_number[etype], int(number))
-        entity_id = f"{etype.upper()}_{number}"
-        next_alias[entity_id] = max(next_alias.get(entity_id, 0), int(alias or 0))
-
     detections = detect_regex(text)
     if ner is None or ner is True:
         ner = default_detector()
@@ -778,38 +926,13 @@ def scan_text(
     # Full names first, so that short forms can be linked to them.
     spans.sort(key=lambda d: (d.source == "propagated", d.start))
 
-    proposed: dict[str, dict] = {}
-    matched: list[str] = []
-    for d in spans:
-        value = text[d.start : d.end]
-        if value in value_to_placeholder:
-            placeholder = value_to_placeholder[value]
-            if placeholder not in proposed and placeholder not in matched:
-                matched.append(placeholder)
-            continue
-
-        entity_id = _find_entity(d.type, value, entities)
-        if entity_id is None and d.alias_of:
-            entity_id = next(
-                (eid for eid, e in entities.items() if d.alias_of in e["values"]), None
-            )
-        if entity_id is None:
-            next_number[d.type] += 1
-            entity_id = f"{d.type.upper()}_{next_number[d.type]}"
-            entities[entity_id] = {"type": d.type, "values": []}
-            placeholder = f"[{entity_id}]"
-        else:
-            next_alias[entity_id] = next_alias.get(entity_id, 0) + 1
-            placeholder = f"[{entity_id}_ALIAS_{next_alias[entity_id]}]"
-
-        entities[entity_id]["values"].append(value)
-        value_to_placeholder[value] = placeholder
-        proposed[placeholder] = {
-            "type": d.type,
-            "value": value,
-            "entity": entity_id,
-            "source": d.source,
-        }
+    declined = set((existing_vault or {}).get("declined", []))
+    candidates = [
+        (d.type, text[d.start : d.end], d.source, d.alias_of)
+        for d in spans
+        if text[d.start : d.end] not in declined
+    ]
+    proposed, matched = propose_mappings(candidates, existing_vault)
 
     warnings = []
     unknown = sorted(set(PLACEHOLDER_RE.findall(text)) - set(_mappings(existing_vault)))
