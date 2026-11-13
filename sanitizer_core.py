@@ -73,7 +73,7 @@ _CO_SUFFIX = (
 _CO_WORD = r"[A-Z][\w'’.-]*"
 _STREET_WORDS = (
     "Street St Avenue Ave Road Rd Drive Dr Lane Ln Boulevard Blvd Way Place Pl Square Sq "
-    "Terrace Parkway Pkwy Pike Highway Hwy Circle Cir Plaza Trail Court Ct"
+    "Terrace Parkway Pkwy Pike Highway Hwy Circle Cir Plaza Trail Ct"
 ).split()
 # Capitalised or ALL CAPS only: "30 days later the road closed" is not an address.
 _STREET_TYPE = "(?:" + "|".join(_STREET_WORDS + [w.upper() for w in _STREET_WORDS]) + ")"
@@ -146,7 +146,7 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "address",
         re.compile(
-            r"(?<![\w-])#?\d{1,6}[A-Za-z]?[ \t]+(?:[A-Z0-9][A-Za-z0-9.'’-]*[ \t]+){0,4}?" + _STREET_TYPE
+            r"(?<![\w.-])#?\d{1,6}[A-Za-z]?[ \t]{1,2}(?:[A-Z0-9][A-Za-z0-9.'’-]*[ \t]{1,2}){0,4}?" + _STREET_TYPE
             + r"\b\.?(?:,?[ \t]+(?i:Suite|Ste\.?|Apt\.?|Unit|Floor|Fl\.?|Room|#)[ \t]*[\w-]+)?"
         ),
     ),
@@ -611,6 +611,18 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             if d.type == "company" and re.search(r"\b(?:corporation|company|partnership)$", bare):
                 continue  # "Delaware corporation" describes an entity, it does not name one
         cleaned.append(Detection(start, end, d.type, d.source, d.alias_of))
+
+    # Overlapping address pieces (the model's "88 Quarry Hill Road, Flagstaff" and
+    # the regex's "Flagstaff, AZ 86001") are joined, not made to compete.
+    addresses = sorted((d for d in cleaned if d.type == "address"), key=lambda d: d.start)
+    cleaned = [d for d in cleaned if d.type != "address"]
+    for d in addresses:
+        last = cleaned[-1] if cleaned and cleaned[-1].type == "address" else None
+        if last and d.start < last.end:
+            source = "regex" if "regex" in (last.source, d.source) else last.source
+            cleaned[-1] = Detection(last.start, max(last.end, d.end), "address", source)
+        else:
+            cleaned.append(d)
 
     kept: list[Detection] = []
     by_priority = sorted(cleaned, key=lambda d: (d.start - d.end, d.source != "regex", d.start))

@@ -89,6 +89,7 @@ def test_regex_detects(text, expected_type, expected_value):
         "under the Delaware General Corporation Law",
         "the Arizona Revised Limited Liability Company Act",
         "Section 5 applies and 30 days later the road closed",
+        "Section 14.05       No Court Proceedings ........ 14-3",
         "the account was opened. In 2019 the number 12345678 appeared",
         "the account was closed in 2019",
         "see page 212 and 555",
@@ -206,6 +207,12 @@ def test_surname_that_is_also_a_word_survives_the_vocabulary_filter():
     assert "Grant" not in safe and "Banks" not in safe
     assert "grant my Trustee" in safe and "Gifts Limited to tuition" in safe
     assert rehydrate_text(safe, vault) == TRUST_TEXT
+
+
+def test_overlapping_address_pieces_are_joined():
+    text = "lives at 88 Quarry Hill Road, Flagstaff, AZ 86001 now"
+    proposal = scan_text(text, ner=fake_ner(address=["88 Quarry Hill Road, Flagstaff"]))
+    assert values(proposal) == {"[ADDRESS_1]": "88 Quarry Hill Road, Flagstaff, AZ 86001"}
 
 
 def test_model_addresses_without_substance_are_dropped():

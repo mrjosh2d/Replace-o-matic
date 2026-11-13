@@ -149,6 +149,45 @@ filings, so real documents will be messier.
 - Filters: capitalised defined terms ("Employee", "the Borrower", "Claimant"),
   courts, and descriptions like "Delaware corporation" are not names.
 
+**Real sample documents.** Five long estate-planning and LLC documents (vendor
+samples with invented parties, about 206,000 words; kept out of the repo) were
+run through the pipeline. They exposed what the short passages could not:
+massive over-redaction. The model tags role words and defined terms as people
+and companies ("trust" 534 times in one document, "my Trustee", "beneficiary",
+"I"), and propagation then spread fragments such as "The" and "Agreement".
+
+| Across the five documents | Proposed vault entries | Replacements made |
+|---|---|---|
+| Before the vocabulary filter | 1,074 | 19,313 |
+| After | 110 | 427 |
+
+After the filter the proposals are mostly real names, and no party name from
+the documents survives in the output. One letterhead address leaked and was
+fixed. These documents have no labels, so there is no recall percentage for
+them: leaks were looked for by searching the redacted text for the known
+names and by reading what capitalised text remained.
+
+How the filter decides (model-found spans only; regex hits are not filtered):
+
+- A span starting with a determiner or possessive ("my Trustee", "each
+  Trustor") is never a name.
+- Otherwise it must contain a capitalised word that is not legal vocabulary
+  (a built-in list of roles, trust and share labels, statutes, agencies) and
+  that the document never also writes in lower case. "Ulysses S Grant" passes
+  in a trust that says "I grant", because of "Ulysses". "Marital Share" fails.
+- A model-found address needs a digit and must start with a capital or digit.
+- Regex company hits ending in a weak word (Limited, Group, Company...) are
+  dropped if the rest is ordinary vocabulary ("See Group", "Survivor Limited").
+
+Also added from these documents: street lines ("#1 Old Capital Square",
+with suite or unit), PO boxes, ALL-CAPS city/state/zip lines, and joining of
+overlapping address pieces.
+
+**Risk introduced by the filter:** a person whose every name is also an
+ordinary word used in lower case in the same document, or legal vocabulary
+("Grant Banks" in a document that says "grant" and "banks"; "Chief Justice"),
+will be dropped unless a regex catches them. Review is the backstop.
+
 **Still missed**
 
 - Nicknames that are not part of the full name ("Gerry" for Gerard, "Seun" for
@@ -162,8 +201,12 @@ filings, so real documents will be messier.
   that ordinary word when capitalised. Round-trip stays exact.
 - A company's first word is redacted on its own ("Orion" from "Orion Tools
   Corp."), except for a short list of generic words (First, National, United...).
-- Organisations that are not parties ("American Arbitration Association") are
-  redacted like any other company.
+- Organisations that are not parties ("American Arbitration Association",
+  "American Cancer Society") are redacted like any other company.
+- What still gets proposed wrongly on the real documents: form labels
+  ("Husband (H)", "Clergyman/Rabbi"), acronyms (RUFADAA, MMMNA), and some
+  capitalised trust types ("Charitable Lead Trust"). These are for the reviewer
+  to decline.
 
 ## Step 4: vault hardening and CLI
 
