@@ -9,7 +9,9 @@
 accepted items to the encrypted vault and writes a redacted text file.
 ``rehydrate`` puts the real values back into a text that contains placeholders.
 
-Reads .txt, .docx and .pdf. Writes plain text. Nothing here uses the network.
+Reads .txt, .docx and .pdf. A .docx is written back as a .docx with its
+formatting intact; other inputs are written as plain text. Nothing here uses
+the network.
 """
 
 from __future__ import annotations
@@ -19,11 +21,11 @@ import getpass
 import os
 import re
 import sys
-import zipfile
 from collections import Counter
-from xml.etree import ElementTree
 
-import sanitizer_core as sc
+import sanitizer_core as sc  # first project import: it sets the offline switches
+
+import docx_io
 
 PASSPHRASE_ENV = "REPLACE_O_MATIC_PASSPHRASE"
 LUCKY_WARNING = (
@@ -41,26 +43,6 @@ class Quit(Exception):
 # Reading documents
 # --------------------------------------------------------------------------
 
-_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-
-
-def _read_docx(path: str) -> str:
-    with zipfile.ZipFile(path) as archive:
-        root = ElementTree.fromstring(archive.read("word/document.xml"))
-    paragraphs = []
-    for paragraph in root.iter(_W + "p"):
-        parts = []
-        for node in paragraph.iter():
-            if node.tag == _W + "t":
-                parts.append(node.text or "")
-            elif node.tag == _W + "tab":
-                parts.append("\t")
-            elif node.tag in (_W + "br", _W + "cr"):
-                parts.append("\n")
-        paragraphs.append("".join(parts))
-    return "\n".join(paragraphs)
-
-
 def _read_pdf(path: str) -> str:
     from pypdf import PdfReader
 
@@ -68,11 +50,11 @@ def _read_pdf(path: str) -> str:
 
 
 def read_document(path: str) -> str:
-    """Text of a .txt, .docx or .pdf file. Headers, footers and footnotes of a
-    .docx are not included; a scanned PDF has no text to extract."""
+    """Text of a .txt, .docx or .pdf file. For a .docx that is the body, headers,
+    footers, footnotes, endnotes and comments. A scanned PDF has no text to extract."""
     extension = os.path.splitext(path)[1].lower()
     if extension == ".docx":
-        text = _read_docx(path)
+        text = docx_io.read_docx(path)
     elif extension == ".pdf":
         text = _read_pdf(path)
     else:
@@ -81,6 +63,18 @@ def read_document(path: str) -> str:
     if not text.strip():
         raise SystemExit(f"No text found in {path}. If it is a scanned PDF, it needs OCR first.")
     return text
+
+
+def _is_docx(path: str) -> bool:
+    return path.lower().endswith(".docx")
+
+
+def _output_path(args, label: str) -> str:
+    """Default output: a .docx stays a .docx (formatting kept); anything else becomes .txt."""
+    if args.output:
+        return args.output
+    stem = os.path.splitext(args.input)[0]
+    return f"{stem}.{label}.docx" if _is_docx(args.input) else f"{stem}.{label}.txt"
 
 
 # --------------------------------------------------------------------------
@@ -264,9 +258,17 @@ def cmd_sanitize(args, ask, out, get) -> int:
     safe = sc.apply_vault(text, vault)
     if sc.rehydrate_text(safe, vault) != text:
         raise SystemExit("Internal error: round-trip check failed. No output written.")
-    output = args.output or os.path.splitext(args.input)[0] + ".sanitized.txt"
-    with open(output, "w", encoding="utf-8") as fh:
-        fh.write(safe)
+    output = _output_path(args, "sanitized")
+    if _is_docx(args.input) and _is_docx(output):
+        # Same file, same formatting; only the sensitive text and author metadata change.
+        docx_io.rewrite_docx(args.input, output, lambda part: sc.find_vault_spans(part, vault), scrub=True)
+        safe = docx_io.read_docx(output)
+        if sc.find_vault_spans(safe, vault):
+            os.unlink(output)
+            raise SystemExit("Internal error: a vault value survived in the .docx. No output written.")
+    else:
+        with open(output, "w", encoding="utf-8") as fh:
+            fh.write(safe)
 
     out(f"\nAdded {len(new_mappings)} item(s) to the vault, declined {len(declined)}.")
     out(f"Replaced {len(sc.find_vault_spans(text, vault))} occurrence(s). Wrote {output}")
@@ -284,9 +286,22 @@ def cmd_rehydrate(args, ask, out, get) -> int:
     text = read_document(args.input)
     vault, _ = _open_vault(args.vault, get)
     restored = sc.rehydrate_text(text, vault)
-    output = args.output or os.path.splitext(args.input)[0] + ".rehydrated.txt"
-    with open(output, "w", encoding="utf-8") as fh:
-        fh.write(restored)
+    output = _output_path(args, "rehydrated")
+    if _is_docx(args.input) and _is_docx(output):
+        mappings = vault["mappings"]
+
+        def edits(part: str):
+            return [
+                (m.start(), m.end(), mappings[m.group(0)]["value"])
+                for m in sc.PLACEHOLDER_RE.finditer(part)
+                if m.group(0) in mappings
+            ]
+
+        docx_io.rewrite_docx(args.input, output, edits)
+        restored = docx_io.read_docx(output)
+    else:
+        with open(output, "w", encoding="utf-8") as fh:
+            fh.write(restored)
     unknown = sorted(set(sc.PLACEHOLDER_RE.findall(restored)))
     out(f"Wrote {output}")
     if unknown:
@@ -317,7 +332,7 @@ def main(argv=None, ask=input, out=print, get=getpass.getpass) -> int:
     sanitize = commands.add_parser("sanitize", help="scan, review and redact a document")
     sanitize.add_argument("input")
     sanitize.add_argument("--vault", required=True, help="encrypted vault file (created if missing)")
-    sanitize.add_argument("-o", "--output", help="default: <input>.sanitized.txt")
+    sanitize.add_argument("-o", "--output", help="default: <input>.sanitized.docx for a .docx, else .sanitized.txt")
     sanitize.add_argument(
         "--lucky", action="store_true", help="I'm feeling lucky: accept everything found, no review"
     )
@@ -327,7 +342,7 @@ def main(argv=None, ask=input, out=print, get=getpass.getpass) -> int:
     rehydrate = commands.add_parser("rehydrate", help="put real values back into a text")
     rehydrate.add_argument("input")
     rehydrate.add_argument("--vault", required=True)
-    rehydrate.add_argument("-o", "--output", help="default: <input>.rehydrated.txt")
+    rehydrate.add_argument("-o", "--output", help="default: <input>.rehydrated.docx for a .docx, else .rehydrated.txt")
     rehydrate.set_defaults(run=cmd_rehydrate)
 
     vault = commands.add_parser("vault", help="summarise a vault")

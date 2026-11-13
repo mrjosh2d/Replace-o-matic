@@ -21,6 +21,8 @@ design decisions and known limits. Update its status table when a step lands.
 
 ## Working here
 
+- Files: `sanitizer_core.py` (detection, vault, apply/rehydrate), `docx_io.py`
+  (.docx parts), `sanitizer_cli.py` (review and commands).
 - Python 3.11. Setup and tests:
   ```
   uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt

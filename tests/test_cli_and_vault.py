@@ -224,18 +224,96 @@ def test_residue_check_flags_other_letter_case():
 # ---------------------------------------------------------------- file formats
 
 
+W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+
+def make_docx(path, body, extra=None):
+    parts = {"word/document.xml": f'<w:document xmlns:w="{W_NS}" xmlns:mc="urn:x-mc"><w:body>{body}</w:body></w:document>'}
+    for name, tag, inner in extra or []:
+        parts[name] = f'<w:{tag} xmlns:w="{W_NS}">{inner}</w:{tag}>'
+    parts["docProps/core.xml"] = (
+        '<cp:coreProperties xmlns:cp="urn:cp" xmlns:dc="urn:dc">'
+        "<dc:creator>John A. Smith</dc:creator><cp:lastModifiedBy>Paralegal Pat</cp:lastModifiedBy>"
+        "<dc:title>Complaint</dc:title></cp:coreProperties>"
+    )
+    parts["word/styles.xml"] = f'<w:styles xmlns:w="{W_NS}"><w:style w:styleId="Bold"/></w:styles>'
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, xml in parts.items():
+            archive.writestr(name, xml)
+
+
+def run_(text, bold=False):
+    props = "<w:rPr><w:b/></w:rPr>" if bold else ""
+    return f'<w:r>{props}<w:t xml:space="preserve">{text}</w:t></w:r>'
+
+
 def test_reads_docx(tmp_path):
-    w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-    xml = (
-        f'<w:document xmlns:w="{w}"><w:body>'
-        "<w:p><w:r><w:t>John A. Smith</w:t></w:r><w:r><w:tab/><w:t xml:space=\"preserve\"> sued</w:t></w:r></w:p>"
+    body = (
+        "<w:p>" + run_("John A. Smith") + "<w:r><w:tab/></w:r>" + run_(" sued") + "</w:p>"
         "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Acme &amp; Sons</w:t><w:br/><w:t>Line two</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
-        "</w:body></w:document>"
     )
     path = tmp_path / "doc.docx"
-    with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("word/document.xml", xml)
+    make_docx(path, body)
     assert cli.read_document(str(path)) == "John A. Smith\t sued\nAcme & Sons\nLine two"
+
+
+DOCX_BODY = (
+    # the name is split across three runs with different formatting
+    "<w:p>" + run_("Plaintiff John ") + run_("A. Sm", bold=True) + run_("ith sued Acme Corporation.") + "</w:p>"
+    "<w:p>" + run_("Smith's SSN is 123-45-6789.") + "</w:p>"
+    '<w:p><w:del w:author="John A. Smith"><w:r><w:delText>Acme Corporation was struck.</w:delText></w:r></w:del></w:p>'
+)
+DOCX_EXTRA = [
+    ("word/header1.xml", "hdr", "<w:p>" + run_("Smith v. Acme Corporation") + "</w:p>"),
+    ("word/footer1.xml", "ftr", "<w:p>" + run_("Prepared for John A. Smith") + "</w:p>"),
+    ("word/footnotes.xml", "footnotes", '<w:footnote w:id="1"><w:p>' + run_("See letter from Acme Corporation.") + "</w:p></w:footnote>"),
+    ("word/endnotes.xml", "endnotes", '<w:endnote w:id="1"><w:p>' + run_("Smith, deposition.") + "</w:p></w:endnote>"),
+    ("word/comments.xml", "comments", '<w:comment w:id="0" w:author="John A. Smith" w:initials="JAS"><w:p>' + run_("Ask Smith.") + "</w:p></w:comment>"),
+]  # fmt: skip
+
+
+def test_docx_text_includes_headers_footers_notes_comments_and_deletions(tmp_path):
+    path = tmp_path / "case.docx"
+    make_docx(path, DOCX_BODY, DOCX_EXTRA)
+    text = cli.read_document(str(path))
+    for expected in (
+        "Plaintiff John A. Smith sued Acme Corporation.", "Acme Corporation was struck.",
+        "Smith v. Acme Corporation", "Prepared for John A. Smith",
+        "See letter from Acme Corporation.", "Smith, deposition.", "Ask Smith.",
+    ):  # fmt: skip
+        assert expected in text
+
+
+def test_docx_in_docx_out_redacts_every_part_and_keeps_formatting(tmp_path):
+    path = tmp_path / "case.docx"
+    make_docx(path, DOCX_BODY, DOCX_EXTRA)
+    original_text = cli.read_document(str(path))
+    code, printed = run(["sanitize", str(path), "--vault", str(tmp_path / "v"), "--lucky"])
+    assert code == 0
+    out_path = tmp_path / "case.sanitized.docx"
+
+    with zipfile.ZipFile(out_path) as archive:
+        everything = "".join(archive.read(n).decode("utf-8") for n in archive.namelist())
+        document = archive.read("word/document.xml").decode("utf-8")
+        assert archive.read("word/styles.xml") == zipfile.ZipFile(path).read("word/styles.xml")
+    for leak in ("Smith", "Acme", "123-45-6789", "Paralegal Pat", "JAS"):
+        assert leak not in everything, leak
+    assert "<w:b/>" in document and document.count("<w:r>") == DOCX_BODY.count("<w:r>")  # runs untouched
+    assert "Complaint" in everything  # non-identifying metadata is kept
+
+    # an LLM's answer, or the same file, comes back as a .docx and is restored
+    code, printed = run(["rehydrate", str(out_path), "--vault", str(tmp_path / "v")])
+    restored = cli.read_document(str(tmp_path / "case.sanitized.rehydrated.docx"))
+    assert restored == original_text
+
+
+def test_docx_can_still_be_written_as_plain_text(tmp_path):
+    path = tmp_path / "case.docx"
+    make_docx(path, DOCX_BODY, DOCX_EXTRA)
+    out_path = tmp_path / "plain.txt"
+    run(["sanitize", str(path), "--vault", str(tmp_path / "v"), "--lucky", "-o", str(out_path)])
+    assert "Smith" not in out_path.read_text() and "[PERSON_1]" in out_path.read_text()
 
 
 def test_reads_pdf(tmp_path):

@@ -12,7 +12,8 @@ machine, and swapped back afterwards using a local JSON vault.
 | 2 | GLiNER (ONNX) detector plugged into `scan_text`; offline model provisioning; surname and company-name propagation | **Done** |
 | 3 | Long-document handling and detection quality: labelled passages, measurement script, gap fixes | **Done** |
 | 4 | Human review, "I'm feeling lucky", encrypted vault, command-line tool, .docx/PDF input | **Done** |
-| 5 | Redacted .docx output that keeps formatting; fresh labelled measurement on real documents | Planned |
+| 5 | .docx in, .docx out with formatting kept; headers, footers, footnotes, endnotes, comments | **Done** |
+| 6 | Labelled measurement on real documents; tolerate altered placeholders | Planned |
 
 ## Step 1: deterministic core (done)
 
@@ -238,9 +239,9 @@ Changing to an operating-system keychain later is small: `save_vault` and
 `load_vault` already accept a raw `key=` in place of a passphrase, and the
 file format is the same.
 
-**File formats.** Reads .txt, .docx (body text and tables; not headers,
-footers or footnotes) and text PDFs. Writes plain text. A PDF's line breaks
-can fall inside a name, which then becomes a separate vault entry.
+**File formats.** Reads .txt, .docx and text PDFs (see step 5 for .docx).
+A PDF's line breaks can fall inside a name, which then becomes a separate
+vault entry.
 
 **Checks on every run.** Round-trip is verified before the output is written.
 Vault values that still appear in a different letter case are listed.
@@ -264,9 +265,39 @@ but it is a network call at runtime and breaks the first hard rule.
   nothing was sent. Anyone who ran an earlier commit on an open network would
   have sent onnxruntime's usage telemetry.
 
-## Step 5: next
+## Step 5: .docx in, .docx out (done)
 
-- Write a redacted .docx that keeps the original formatting.
-- Read .docx headers, footers and footnotes.
+`docx_io.py`. A .docx given to `sanitize` or `rehydrate` now comes back as a
+.docx (`-o something.txt` still gives plain text).
+
+- **Everything with text is read and redacted:** body, tables, headers,
+  footers, footnotes, endnotes, comments, and text deleted under Track Changes
+  (it is still in the file).
+- **Formatting is kept.** Word splits a paragraph into runs wherever formatting
+  changes, so one name can sit across several XML nodes. Edits are written back
+  into the original nodes; no run, style or layout element is added or removed.
+  Parts with no change are copied byte for byte.
+- **Author metadata is blanked** in the redacted file: creator, last-modified-by,
+  company, manager, and the author names on comments and tracked changes.
+  These are not restored by `rehydrate`.
+- **Checked on every run:** the written file is read back and must contain no
+  vault value, or it is deleted and the run fails.
+
+Tried on the 21,000-word Will sample (71 parts, 54 of them headers and
+footers): 85 replacements, no party name left, same 78 pages before and after
+when opened in LibreOffice, 10 of 71 parts changed.
+
+Limits:
+
+- A value that spans a line or paragraph break (a two-line letterhead address)
+  is replaced by one placeholder in the first line, and the break stays. After
+  `rehydrate` the full value sits on that first line.
+- Text inside embedded objects (charts, embedded spreadsheets, images) is not
+  touched. Field codes and hyperlink targets are not touched, only visible text.
+- Not opened in Microsoft Word here; only LibreOffice was available.
+
+## Step 6: next
+
 - Label a few real documents and measure recall on them properly.
 - Tolerate placeholders an LLM has altered (`[person_1]`, `PERSON 1`).
+- Redacted PDF output (today a PDF comes back as plain text).
