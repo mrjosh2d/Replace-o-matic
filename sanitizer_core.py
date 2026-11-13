@@ -50,7 +50,8 @@ class Detection:
     start: int
     end: int
     type: str
-    source: str = "ner"  # "regex" or "ner"
+    source: str = "ner"  # "regex", "ner" or "propagated"
+    alias_of: str = ""  # propagated short forms: the full value they were derived from
 
 
 #: An NER backend: takes the text, returns the spans it considers sensitive.
@@ -70,6 +71,8 @@ _CO_SUFFIX = (
     r"|Ltd\.|Ltd|Limited|L\.P\.|LP|PLC|P\.C\.|N\.A\.|GmbH)"
 )
 _CO_WORD = r"[A-Z][\w'’.-]*"
+# Words that end a firm's name without being a legal suffix: "Zhang & Associates".
+_CO_KIND = r"(?:Associates|Partners|Holdings|Group|ASSOCIATES|PARTNERS|HOLDINGS|GROUP)"
 
 # (entity type, pattern). If the pattern has a group named "v", only that
 # group is the sensitive value; otherwise the whole match is.
@@ -94,7 +97,21 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "company",
         re.compile(
             _B + _CO_WORD + r"(?:,?[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,5}?,?[ \t]+"
+            + r"(?=[A-Z])"  # "a Delaware limited liability company" is not a name
             + _CO_SUFFIX + r"(?!\w)"
+        ),
+    ),
+    (
+        "company",
+        re.compile(
+            _B + _CO_WORD + r"(?:[ \t]+" + _CO_WORD + r"){0,3}?[ \t]+(?:&[ \t]+)?" + _CO_KIND + r"(?!\w)"
+        ),
+    ),
+    # "City, ST 12345": the half of an address the model most often drops
+    (
+        "address",
+        re.compile(
+            _B + r"(?:[A-Z][a-z]+\.?[ \t]+){0,2}[A-Z][a-z]+,[ \t]+[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?" + _E
         ),
     ),
     ("email", re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")),
@@ -110,7 +127,7 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 def detect_regex(text: str) -> list[Detection]:
     """Find SSNs, EINs, bank account numbers, IBANs, suffixed company names,
-    emails and phone numbers."""
+    city/state/zip lines, emails and phone numbers."""
     found = []
     for etype, pattern in REGEX_PATTERNS:
         for m in pattern.finditer(text):
@@ -152,11 +169,13 @@ class GlinerDetector:
     def __init__(
         self,
         model_dir: str | os.PathLike | None = None,
-        threshold: float = 0.4,
+        threshold: float = 0.3,
         window_words: int = 200,
         overlap_words: int = 40,
         model=None,
     ):
+        if not 0 <= overlap_words < window_words // 2:
+            raise ValueError("overlap_words must be less than half of window_words")
         self.threshold = threshold
         self.window_words = window_words
         self.overlap_words = overlap_words
@@ -194,14 +213,33 @@ class GlinerDetector:
         )
 
     def _windows(self, text: str) -> list[tuple[int, int]]:
+        """Character ranges of at most ``window_words`` words each.
+
+        A window ends at a paragraph break if one falls in its last quarter,
+        else at a sentence end, else wherever the word limit lands. Windows
+        still overlap, because "sentence end" is a guess ("Mr." ends in a dot).
+        """
         words = [(m.start(), m.end()) for m in re.finditer(r"\S+", text)]
-        if not words:
-            return []
-        step = self.window_words - self.overlap_words
-        return [
-            (words[i][0], words[min(i + self.window_words, len(words)) - 1][1])
-            for i in range(0, max(len(words) - self.overlap_words, 1), step)
-        ]
+        windows = []
+        i = 0
+        while i < len(words):
+            j = min(i + self.window_words, len(words))
+            if j < len(words):
+                candidates = range(j - 1, i + self.window_words * 3 // 4 - 1, -1)
+                gap = lambda k: text[words[k][1] : words[k + 1][0]]
+                cut = next((k for k in candidates if gap(k).count("\n") >= 2), None)
+                if cut is None:
+                    cut = next(
+                        (k for k in candidates if text[words[k][1] - 1] in ".?!;:" or "\n" in gap(k)),
+                        None,
+                    )
+                if cut is not None:
+                    j = cut + 1
+            windows.append((words[i][0], words[j - 1][1]))
+            if j >= len(words):
+                break
+            i = j - self.overlap_words
+        return windows
 
     def __call__(self, text: str) -> list[Detection]:
         found = []
@@ -237,6 +275,25 @@ _COMPANY_SUFFIXES = {
 }  # fmt: skip
 _HONORIFICS = {"mr", "mrs", "ms", "miss", "mx", "dr", "prof", "hon", "judge", "justice"}
 _NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "esq", "phd", "md"}
+
+# Role words that contracts capitalise as defined terms. NER models tag them as
+# people or companies, but they identify nobody.
+_DEFINED_TERMS = {
+    "affiant", "agent", "assignee", "assignor", "borrower", "buyer", "client", "company",
+    "contractor", "consultant", "corporation", "counsel", "court", "customer", "debtor",
+    "defendant", "deponent", "discloser", "employee", "employer", "executor", "firm",
+    "grantee", "grantor", "guarantor", "holder", "landlord", "lender", "lessee", "lessor",
+    "licensee", "licensor", "maker", "parties", "party", "payee", "petitioner", "plaintiff",
+    "purchaser", "recipient", "respondent", "seller", "settlor", "tenant", "trustee",
+    "undersigned", "vendor", "witness",
+}  # fmt: skip
+
+# First words too generic to stand for a company on their own.
+_GENERIC_LEADING_WORDS = {
+    "the", "first", "american", "united", "national", "general", "new", "north", "south",
+    "east", "west", "international", "global", "city", "state", "bank", "law", "saint", "st",
+    "old", "great", "royal", "federal", "central", "pacific", "atlantic",
+}  # fmt: skip
 
 
 def _words(value: str) -> list[str]:
@@ -399,8 +456,15 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             span = re.sub(r"['’]s$", "", span)  # "Acme's" -> "Acme"
         end = start + len(span.rstrip())
         start += len(span) - len(span.lstrip())
-        if start < end and not PLACEHOLDER_RE.search(text[start:end]):
-            cleaned.append(Detection(start, end, d.type, d.source))
+        if start >= end or PLACEHOLDER_RE.search(text[start:end]):
+            continue
+        if d.type in ("person", "company"):
+            bare = re.sub(r"^(?:the|an?)\s+", "", text[start:end], flags=re.IGNORECASE)
+            if bare.casefold() in _DEFINED_TERMS:
+                continue  # "Employee", "the Borrower"
+            if d.type == "company" and re.search(r"\bCourt\b", bare):
+                continue  # courts are public bodies, not parties
+        cleaned.append(Detection(start, end, d.type, d.source, d.alias_of))
 
     kept: list[Detection] = []
     by_priority = sorted(cleaned, key=lambda d: (d.start - d.end, d.source != "regex", d.start))
@@ -428,31 +492,52 @@ def _short_forms(etype: str, value: str) -> list[str]:
     """Shorter names a known entity is likely to be called by elsewhere in a text."""
     if etype == "person":
         words = re.findall(r"[\w'’-]+", value)
-        while len(words) > 1 and words[-1].casefold().rstrip(".") in _NAME_SUFFIXES:
+        while len(words) > 1 and words[-1].casefold() in _NAME_SUFFIXES:
             words.pop()
-        surname = words[-1] if len(words) > 1 else ""
-        return [surname] if len(surname) >= 3 and surname[0].isupper() else []
+        while len(words) > 1 and words[0].casefold() in _HONORIFICS:
+            words.pop(0)
+        if len(words) < 2:
+            return []
+        # Surname and first name; initials and two-letter tokens are skipped.
+        return [w for w in (words[-1], words[0]) if len(w) >= 3 and w[0].isupper()]
     if etype == "company":
-        core = re.sub(r"(?:[,\s]+" + _CO_SUFFIX + r")+$", "", value)
-        return [core] if core != value and len(core) >= 3 else []
+        core = re.sub(
+            r"(?:[,\s]+(?:&\s+)?(?:" + _CO_SUFFIX + "|" + _CO_KIND + r"))+$", "", value
+        )
+        forms = [core] if core != value else []
+        # Leading words: "Cedar Ridge Properties LLC" is later just "Cedar Ridge".
+        words = core.split()
+        for n in range(len(words) - 1, 0, -1):
+            if words[n - 1] in ("&", "of", "and") or words[n] == "&":
+                continue
+            forms.append(" ".join(words[:n]).rstrip(","))
+        return [
+            f
+            for f in forms
+            if len(f) >= 3 and f[0].isupper() and f.casefold() not in _GENERIC_LEADING_WORDS
+        ]
     return []
 
 
-def _propagate(text: str, spans: list[Detection], known: Iterable[tuple[str, str]]) -> list[Detection]:
-    """Tag bare surnames and suffix-less company names that the model missed.
+def _propagate(text: str, known: Iterable[tuple[str, str]]) -> list[Detection]:
+    """Tag short forms of known names that the model missed.
 
-    NER models are confident about "John A. Smith" and "Acme Corporation" but
-    often skip a later bare "Smith" or "Acme". ``known`` is (type, value) pairs.
+    NER models are confident about "John A. Smith" and "Cedar Ridge Properties
+    LLC" but often skip a later bare "Smith", "John" or "Cedar Ridge".
+    ``known`` is (type, value) pairs from this text and from the vault.
     """
-    extra = []
-    seen = set()
+    parents: dict[tuple[str, str], set[str]] = {}
     for etype, value in known:
         for short in _short_forms(etype, value):
-            if (etype, short) in seen:
-                continue
-            seen.add((etype, short))
-            for m in re.finditer(r"(?<!\w)" + re.escape(short) + r"(?!\w)", text):
-                extra.append(Detection(m.start(), m.end(), etype, "propagated"))
+            parents.setdefault((etype, short), set()).add(value)
+
+    extra = []
+    for (etype, short), values in parents.items():
+        # Only a company short form is tied to its parent here; for people the
+        # ambiguity rules in _find_entity decide (two Smiths, one bare "Smith").
+        alias_of = next(iter(values)) if etype == "company" and len(values) == 1 else ""
+        for m in re.finditer(r"(?<!\w)" + re.escape(short) + r"(?!\w)", text):
+            extra.append(Detection(m.start(), m.end(), etype, "propagated", alias_of))
     return extra
 
 
@@ -475,7 +560,8 @@ def scan_text(
          "warnings": [str, ...]}
 
     Numbering is deterministic: entities are numbered in order of first
-    appearance, continuing from the highest number already in the vault.
+    appearance (detected names first, then short forms derived from them),
+    continuing from the highest number already in the vault.
     Pass the result's ``proposed`` dict to :func:`merge_vault` once reviewed.
     """
     value_to_placeholder = _value_index(existing_vault)
@@ -504,7 +590,9 @@ def scan_text(
     spans = _clean_spans(text, detections)
     known = [(e["type"], e["value"]) for e in _mappings(existing_vault).values()]
     known += [(d.type, text[d.start : d.end]) for d in spans]
-    spans = _clean_spans(text, spans + _propagate(text, spans, known))
+    spans = _clean_spans(text, spans + _propagate(text, known))
+    # Full names first, so that short forms can be linked to them.
+    spans.sort(key=lambda d: (d.source == "propagated", d.start))
 
     proposed: dict[str, dict] = {}
     matched: list[str] = []
@@ -517,6 +605,10 @@ def scan_text(
             continue
 
         entity_id = _find_entity(d.type, value, entities)
+        if entity_id is None and d.alias_of:
+            entity_id = next(
+                (eid for eid, e in entities.items() if d.alias_of in e["values"]), None
+            )
         if entity_id is None:
             next_number[d.type] += 1
             entity_id = f"{d.type.upper()}_{next_number[d.type]}"
@@ -545,17 +637,16 @@ def scan_text(
     return {"proposed": proposed, "matched": matched, "warnings": warnings}
 
 
-def apply_vault(text: str, vault: dict) -> str:
-    """Replace every vault value in ``text`` with its placeholder.
+def find_vault_spans(text: str, vault: dict) -> list[tuple[int, int, str]]:
+    """Where each vault value occurs in ``text``: (start, end, placeholder).
 
     One regex pass, longest value first, whole words only: "John" never fires
     inside "Johnson", and "Acme" never eats the start of "Acme Holdings LLC"
-    when both are in the vault. Placeholders already present are left alone,
-    so applying twice is the same as applying once.
+    when both are in the vault. Placeholders already in the text are skipped.
     """
     index = _value_index(vault)
     if not index:
-        return text
+        return []
 
     def bounded(value: str) -> str:
         # Word boundaries only where the value itself starts/ends with a word char.
@@ -567,7 +658,22 @@ def apply_vault(text: str, vault: dict) -> str:
     pattern = re.compile(
         "(" + PLACEHOLDER_RE.pattern + ")|" + "|".join(bounded(v) for v in longest_first)
     )
-    return pattern.sub(lambda m: m.group(1) or index[m.group(0)], text)
+    return [
+        (m.start(), m.end(), index[m.group(0)]) for m in pattern.finditer(text) if not m.group(1)
+    ]
+
+
+def apply_vault(text: str, vault: dict) -> str:
+    """Replace every vault value in ``text`` with its placeholder.
+
+    Matching rules are those of :func:`find_vault_spans`. Placeholders already
+    present are left alone, so applying twice is the same as applying once.
+    """
+    out, pos = [], 0
+    for start, end, placeholder in find_vault_spans(text, vault):
+        out += [text[pos:start], placeholder]
+        pos = end
+    return "".join(out) + text[pos:]
 
 
 def rehydrate_text(text: str, vault: dict) -> str:

@@ -60,6 +60,42 @@ def test_entity_straddling_a_window_edge_is_caught_by_the_overlap():
     assert model.calls[0].endswith("Jane")  # the first window really did cut the name
 
 
+def window_texts(text, **kw):
+    detector = GlinerDetector(model=FakeModel({}), **kw)
+    return [text[a:b] for a, b in detector._windows(text)]
+
+
+def test_windows_prefer_paragraph_breaks_then_sentence_ends():
+    para = "one two three four five six seven. eight nine ten"
+    text = para + "\n\n" + "alpha beta gamma delta epsilon zeta eta theta. iota kappa lambda mu nu xi"
+    chunks = window_texts(text, window_words=12, overlap_words=2)
+    assert chunks[0] == para  # cut at the blank line, not mid-sentence at word 12
+    assert chunks[1].startswith("nine ten")  # overlap is kept
+    assert chunks[1].endswith("theta.")  # no paragraph break in range: cut at sentence end
+
+
+def test_windows_cover_every_word_and_never_exceed_the_limit():
+    import random
+
+    rng = random.Random(7)
+    words = [rng.choice(["Mr.", "x", "end.", "word", "a;", "b\n\nc", "d\ne"]) for _ in range(3000)]
+    text = " ".join(words)
+    detector = GlinerDetector(model=FakeModel({}), window_words=50, overlap_words=10)
+    covered = set()
+    previous_end = 0
+    for a, b in detector._windows(text):
+        assert len(text[a:b].split()) <= 50
+        assert a <= previous_end  # no gap between consecutive windows
+        covered.update(range(a, b))
+        previous_end = b
+    assert all(i in covered for i, ch in enumerate(text) if not ch.isspace())
+
+
+def test_overlap_must_leave_room_to_advance():
+    with pytest.raises(ValueError):
+        GlinerDetector(model=FakeModel({}), window_words=10, overlap_words=5)
+
+
 def test_empty_and_whitespace_text():
     detector = GlinerDetector(model=FakeModel({}))
     assert detector("") == [] and detector("  \n ") == []
@@ -109,3 +145,32 @@ def test_real_model_end_to_end_without_network(monkeypatch):
     assert entity_of["Mary Smithson"] != entity_of["Smith"]
     assert entity_of["Acme Corporation"] == entity_of["Acme"]
     assert entity_of["Acme Holdings LLC"] != entity_of["Acme Corporation"]
+
+
+def load_eval(name):
+    import json
+
+    path = os.path.join(os.path.dirname(__file__), "eval", name)
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@pytest.mark.parametrize("name", ["passages.json"])
+def test_eval_labels_occur_in_their_passages(name):
+    for passage in load_eval(name):
+        for entity in passage["entities"]:
+            assert entity["text"] in passage["text"], (passage["id"], entity["text"])
+            assert entity["type"] in sanitizer_core.ENTITY_TYPES
+
+
+@pytest.mark.model
+@needs_model
+def test_recall_on_labelled_passages_does_not_regress():
+    import sys
+
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+    from evaluate import evaluate
+
+    stats, leaks, extras = evaluate(load_eval("passages.json"), sanitizer_core.default_detector())
+    assert stats["hit_chars"] / stats["gold_chars"] >= 0.99, leaks
+    assert len(extras) <= 3, extras

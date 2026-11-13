@@ -1,0 +1,918 @@
+[
+  {
+    "id": "settlement-01",
+    "doc_type": "settlement agreement",
+    "text": "SETTLEMENT AGREEMENT\n\nThis Settlement Agreement is entered into as of March 3, 2024, by Maria Q. Delgado (\"Delgado\") and Northwind Logistics LLC (\"Northwind\"), a Delaware limited liability company with offices at 4120 Harbor View Drive, Suite 300, Tacoma, WA 98402. In consideration of the payment of $48,500.00, Ms. Delgado releases all claims against Northwind Logistics and its officers arising under 29 U.S.C. § 2615. Payment shall be wired to Account No. 004455667788, routing number 021000089. Maria agrees to keep the terms confidential, and Northwind's obligations under Section 4.2 shall survive. Notices to Delgado shall be sent to maria.delgado@example.com or by phone at (253) 555-0142. Ms. Delgado's Social Security Number, 412-55-7890, is provided solely for tax reporting. This Agreement is governed by the laws of the State of Washington.",
+    "entities": [
+      {
+        "text": "Maria Q. Delgado",
+        "type": "person"
+      },
+      {
+        "text": "Delgado",
+        "type": "person"
+      },
+      {
+        "text": "Maria",
+        "type": "person"
+      },
+      {
+        "text": "Northwind Logistics LLC",
+        "type": "company"
+      },
+      {
+        "text": "Northwind",
+        "type": "company"
+      },
+      {
+        "text": "Northwind Logistics",
+        "type": "company"
+      },
+      {
+        "text": "4120 Harbor View Drive, Suite 300, Tacoma, WA 98402",
+        "type": "address"
+      },
+      {
+        "text": "004455667788",
+        "type": "financial_id"
+      },
+      {
+        "text": "021000089",
+        "type": "financial_id"
+      },
+      {
+        "text": "412-55-7890",
+        "type": "financial_id"
+      },
+      {
+        "text": "maria.delgado@example.com",
+        "type": "email"
+      },
+      {
+        "text": "(253) 555-0142",
+        "type": "phone"
+      }
+    ]
+  },
+  {
+    "id": "nda-01",
+    "doc_type": "nondisclosure agreement",
+    "text": "MUTUAL NONDISCLOSURE AGREEMENT\n\nThis Agreement is made between Bluebird Analytics, Inc. (\"Bluebird\"), 77 Mercer Plaza, PO Box 2218, Austin, TX 78701, and Halcyon Partners Ltd. (\"Halcyon\"). The \"Disclosing Party\" and the \"Receiving Party\" shall each protect Confidential Information. Bluebird designates Dr. Helen Grant as its technical contact; Halcyon designates José Álvarez-Peña. Dr. Grant may disclose Confidential Information to Halcyon only under Section 3. Mr. Álvarez-Peña shall not copy any materials, and Grant shall log all transfers. Questions go to helen.grant@bluebirdanalytics.example or 512.555.0187. Bluebird's trade secrets are protected under 18 U.S.C. § 1836 and the Texas Uniform Trade Secrets Act. This Agreement expires on June 30, 2027, and disputes shall be heard in the courts of Travis County.",
+    "entities": [
+      {
+        "text": "Helen Grant",
+        "type": "person"
+      },
+      {
+        "text": "Grant",
+        "type": "person"
+      },
+      {
+        "text": "José Álvarez-Peña",
+        "type": "person"
+      },
+      {
+        "text": "Álvarez-Peña",
+        "type": "person"
+      },
+      {
+        "text": "Bluebird Analytics, Inc.",
+        "type": "company"
+      },
+      {
+        "text": "Bluebird",
+        "type": "company"
+      },
+      {
+        "text": "Halcyon Partners Ltd.",
+        "type": "company"
+      },
+      {
+        "text": "Halcyon",
+        "type": "company"
+      },
+      {
+        "text": "77 Mercer Plaza, PO Box 2218, Austin, TX 78701",
+        "type": "address"
+      },
+      {
+        "text": "helen.grant@bluebirdanalytics.example",
+        "type": "email"
+      },
+      {
+        "text": "512.555.0187",
+        "type": "phone"
+      }
+    ]
+  },
+  {
+    "id": "employment-01",
+    "doc_type": "employment agreement",
+    "text": "EMPLOYMENT AGREEMENT\n\nThis Employment Agreement is between Brightwater Systems Corp. (the \"Company\") and Patrick J. O'Neill Jr. (the \"Employee\"). The Employee shall serve as Vice President of Operations at an annual salary of $185,000, reporting to Brightwater's Chief Executive Officer, Susan Banks. Mr. O'Neill's principal place of work will be 900 Lakeshore Boulevard, Chicago, IL 60601. Patrick acknowledges receipt of the Brightwater handbook. Ms. Banks may modify duties on thirty days' notice. O'Neill agrees to a twelve-month non-competition covenant enforceable under the laws of the State of Illinois. Payroll will reference EIN 36-7788990 for the Company and SSN 523-44-1198 for the Employee. Direct deposit: routing number 071000013, Account No. 9981200345. Contact: (312) 555-0176.",
+    "entities": [
+      {
+        "text": "Patrick J. O'Neill Jr.",
+        "type": "person"
+      },
+      {
+        "text": "O'Neill",
+        "type": "person"
+      },
+      {
+        "text": "Patrick",
+        "type": "person"
+      },
+      {
+        "text": "Susan Banks",
+        "type": "person"
+      },
+      {
+        "text": "Banks",
+        "type": "person"
+      },
+      {
+        "text": "Brightwater Systems Corp.",
+        "type": "company"
+      },
+      {
+        "text": "Brightwater",
+        "type": "company"
+      },
+      {
+        "text": "900 Lakeshore Boulevard, Chicago, IL 60601",
+        "type": "address"
+      },
+      {
+        "text": "36-7788990",
+        "type": "financial_id"
+      },
+      {
+        "text": "523-44-1198",
+        "type": "financial_id"
+      },
+      {
+        "text": "071000013",
+        "type": "financial_id"
+      },
+      {
+        "text": "9981200345",
+        "type": "financial_id"
+      },
+      {
+        "text": "(312) 555-0176",
+        "type": "phone"
+      }
+    ]
+  },
+  {
+    "id": "lease-01",
+    "doc_type": "commercial lease",
+    "text": "COMMERCIAL LEASE\n\nThis Lease is made on January 15, 2025, between Cedar Ridge Properties LLC (\"Landlord\") and Fernwood Bakery (\"Tenant\"). Landlord leases to Tenant the premises at 1550 Oak Street, Unit 4B, Portland, OR 97205, for a term of five years at monthly rent of $6,200. Fernwood guarantees payment through its owner, Thomas R. Whitfield III. If Whitfield defaults, Cedar Ridge may pursue remedies under Oregon law. Rent shall be paid to Cedar Ridge Properties at PO Box 8841, Portland, OR 97207, or by ACH to Account No. 7712009834, routing number 123006800. Mr. Whitfield's telephone is 503-555-0119 and his email is twhitfield@fernwoodbakery.example. Landlord's agent signs below.\n\nCEDAR RIDGE PROPERTIES LLC",
+    "entities": [
+      {
+        "text": "Thomas R. Whitfield III",
+        "type": "person"
+      },
+      {
+        "text": "Whitfield",
+        "type": "person"
+      },
+      {
+        "text": "Cedar Ridge Properties LLC",
+        "type": "company"
+      },
+      {
+        "text": "Fernwood Bakery",
+        "type": "company"
+      },
+      {
+        "text": "Fernwood",
+        "type": "company"
+      },
+      {
+        "text": "Cedar Ridge Properties",
+        "type": "company"
+      },
+      {
+        "text": "Cedar Ridge",
+        "type": "company"
+      },
+      {
+        "text": "CEDAR RIDGE PROPERTIES LLC",
+        "type": "company"
+      },
+      {
+        "text": "1550 Oak Street, Unit 4B, Portland, OR 97205",
+        "type": "address"
+      },
+      {
+        "text": "PO Box 8841, Portland, OR 97207",
+        "type": "address"
+      },
+      {
+        "text": "7712009834",
+        "type": "financial_id"
+      },
+      {
+        "text": "123006800",
+        "type": "financial_id"
+      },
+      {
+        "text": "503-555-0119",
+        "type": "phone"
+      },
+      {
+        "text": "twhitfield@fernwoodbakery.example",
+        "type": "email"
+      }
+    ]
+  },
+  {
+    "id": "deposition-01",
+    "doc_type": "deposition transcript",
+    "text": "DEPOSITION OF DR. KAREN VOSS\n\nQ. Please state your name for the record.\nA. Karen L. Voss.\nQ. Dr. Voss, where are you employed?\nA. I am a consultant with Lumen Health Partners. Before that I worked at Marlowe & Finch Diagnostics.\nQ. Did you meet with Mr. Rourke before preparing your report?\nA. Yes. Daniel Rourke met me at my office, 215 Willow Lane, Madison, WI 53703, on May 9, 2024.\nQ. And did you also speak with his sister?\nA. I spoke briefly with Elaine Rourke by phone at (608) 555-0133. Elaine mentioned the bill from Lumen.\nQ. Was anything in your report changed after that call?\nA. No, nothing. Dr. Voss's opinions under Rule 702 were final by then.\nQ. Thank you. Ms. Rourke's call was not recorded?\nA. Correct.",
+    "entities": [
+      {
+        "text": "KAREN VOSS",
+        "type": "person"
+      },
+      {
+        "text": "Karen L. Voss",
+        "type": "person"
+      },
+      {
+        "text": "Voss",
+        "type": "person"
+      },
+      {
+        "text": "Rourke",
+        "type": "person"
+      },
+      {
+        "text": "Daniel Rourke",
+        "type": "person"
+      },
+      {
+        "text": "Elaine Rourke",
+        "type": "person"
+      },
+      {
+        "text": "Elaine",
+        "type": "person"
+      },
+      {
+        "text": "Lumen Health Partners",
+        "type": "company"
+      },
+      {
+        "text": "Lumen",
+        "type": "company"
+      },
+      {
+        "text": "Marlowe & Finch Diagnostics",
+        "type": "company"
+      },
+      {
+        "text": "215 Willow Lane, Madison, WI 53703",
+        "type": "address"
+      },
+      {
+        "text": "(608) 555-0133",
+        "type": "phone"
+      }
+    ]
+  },
+  {
+    "id": "demand-01",
+    "doc_type": "demand letter",
+    "text": "HARGROVE & LINDQVIST LLP\n2800 Commerce Tower, Suite 1100\nColumbus, OH 43215\n\nNovember 2, 2025\n\nVia Certified Mail\n\nGregory Tanner\nTanner Roofing\n88 Dockside Road\nDayton, OH 45402\n\nRe: Unpaid invoices of Mabel Okafor-Reyes\n\nDear Mr. Tanner:\n\nThis firm represents Mabel Okafor-Reyes. Tanner Roofing failed to pay invoice nos. 2291 and 2305 totaling $12,740.00 for work completed in August. Unless Tanner Roofing remits payment within ten days, Ms. Okafor-Reyes will file suit in the Court of Common Pleas and seek interest under Ohio Rev. Code § 1343.03. Please call me at 614-555-0164 or write to rhargrove@hargrovelindqvist.example. Gregory, I would prefer to resolve this without litigation.\n\nSincerely,\nRebecca Hargrove",
+    "entities": [
+      {
+        "text": "Gregory Tanner",
+        "type": "person"
+      },
+      {
+        "text": "Tanner",
+        "type": "person"
+      },
+      {
+        "text": "Gregory",
+        "type": "person"
+      },
+      {
+        "text": "Mabel Okafor-Reyes",
+        "type": "person"
+      },
+      {
+        "text": "Okafor-Reyes",
+        "type": "person"
+      },
+      {
+        "text": "Rebecca Hargrove",
+        "type": "person"
+      },
+      {
+        "text": "HARGROVE & LINDQVIST LLP",
+        "type": "company"
+      },
+      {
+        "text": "Tanner Roofing",
+        "type": "company"
+      },
+      {
+        "text": "2800 Commerce Tower, Suite 1100",
+        "type": "address"
+      },
+      {
+        "text": "Columbus, OH 43215",
+        "type": "address"
+      },
+      {
+        "text": "88 Dockside Road",
+        "type": "address"
+      },
+      {
+        "text": "Dayton, OH 45402",
+        "type": "address"
+      },
+      {
+        "text": "614-555-0164",
+        "type": "phone"
+      },
+      {
+        "text": "rhargrove@hargrovelindqvist.example",
+        "type": "email"
+      }
+    ]
+  },
+  {
+    "id": "complaint-01",
+    "doc_type": "court caption and complaint",
+    "text": "IN THE UNITED STATES DISTRICT COURT\nFOR THE SOUTHERN DISTRICT OF NEW YORK\n\nJAMES T. BANKS, Plaintiff,\nv.\nMERIDIAN FREIGHT INC., Defendant.\n\nCase No. 1:25-cv-04417\n\nCOMPLAINT\n\n1. Plaintiff James T. Banks is an individual residing at 62 Juniper Court, Albany, NY 12207.\n2. Defendant Meridian Freight Inc. (\"Meridian\") is a corporation with its principal place of business at 1 Pier Plaza, Brooklyn, NY 11201.\n3. Jurisdiction is proper under 28 U.S.C. § 1332. On July 8, 2024, Banks was injured when a Meridian truck struck his vehicle. Meridian's driver, Luis Ferreira, admitted fault to Mr. Banks at the scene.\n4. Banks seeks damages exceeding $75,000, plus costs.",
+    "entities": [
+      {
+        "text": "JAMES T. BANKS",
+        "type": "person"
+      },
+      {
+        "text": "James T. Banks",
+        "type": "person"
+      },
+      {
+        "text": "Banks",
+        "type": "person"
+      },
+      {
+        "text": "Luis Ferreira",
+        "type": "person"
+      },
+      {
+        "text": "MERIDIAN FREIGHT INC.",
+        "type": "company"
+      },
+      {
+        "text": "Meridian Freight Inc.",
+        "type": "company"
+      },
+      {
+        "text": "Meridian",
+        "type": "company"
+      },
+      {
+        "text": "62 Juniper Court, Albany, NY 12207",
+        "type": "address"
+      },
+      {
+        "text": "1 Pier Plaza, Brooklyn, NY 11201",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "id": "note-01",
+    "doc_type": "promissory note",
+    "text": "PROMISSORY NOTE\n\nFor value received, Hiroshi Tanaka (\"Borrower\") promises to pay to the order of Pinecrest Capital Partners (\"Lender\") the principal sum of $250,000.00, with interest at 6.5% per annum, on or before December 31, 2028. Payments shall be made to Lender's account at First Meridian Bank, N.A., Account No. 55120076, routing number 026009593. Pinecrest may accelerate this Note upon default. Tanaka waives presentment and notice of dishonor. Borrower's taxpayer identification number is 84-1357924. Any notice to Pinecrest shall be sent to 500 Alder Avenue, Floor 9, Denver, CO 80202, Attn: Eleanor Whitcomb-Shaw. Ms. Whitcomb-Shaw may be reached at (303) 555-0108. This Note is governed by Colorado law.\n\nPINECREST CAPITAL PARTNERS",
+    "entities": [
+      {
+        "text": "Hiroshi Tanaka",
+        "type": "person"
+      },
+      {
+        "text": "Tanaka",
+        "type": "person"
+      },
+      {
+        "text": "Eleanor Whitcomb-Shaw",
+        "type": "person"
+      },
+      {
+        "text": "Whitcomb-Shaw",
+        "type": "person"
+      },
+      {
+        "text": "Pinecrest Capital Partners",
+        "type": "company"
+      },
+      {
+        "text": "Pinecrest",
+        "type": "company"
+      },
+      {
+        "text": "First Meridian Bank, N.A.",
+        "type": "company"
+      },
+      {
+        "text": "PINECREST CAPITAL PARTNERS",
+        "type": "company"
+      },
+      {
+        "text": "500 Alder Avenue, Floor 9, Denver, CO 80202",
+        "type": "address"
+      },
+      {
+        "text": "55120076",
+        "type": "financial_id"
+      },
+      {
+        "text": "026009593",
+        "type": "financial_id"
+      },
+      {
+        "text": "84-1357924",
+        "type": "financial_id"
+      },
+      {
+        "text": "(303) 555-0108",
+        "type": "phone"
+      }
+    ]
+  },
+  {
+    "id": "engagement-01",
+    "doc_type": "engagement letter",
+    "text": "ENGAGEMENT LETTER\n\nDear Dr. Raman:\n\nThank you for retaining Okonkwo & Brandt LLP (\"the Firm\") to represent Priya Raman and Raman Dental Group in the dispute with your former landlord. Marcus Brandt will serve as lead counsel, assisted by associate Chloe Brandt-Nguyen. Our hourly rates are $425 and $290, respectively. Please send the retainer of $5,000 by check or wire to Account No. 3300187765, routing number 111000025. Okonkwo & Brandt will bill monthly. Priya, please sign below and return this letter to 18 Granite Street, Suite 22, Providence, RI 02903. If you have questions, call Marcus at (401) 555-0129 or email mbrandt@okonkwobrandt.example. Our conflicts check disclosed no relationship with any party adverse to you.",
+    "entities": [
+      {
+        "text": "Priya Raman",
+        "type": "person"
+      },
+      {
+        "text": "Raman",
+        "type": "person"
+      },
+      {
+        "text": "Priya",
+        "type": "person"
+      },
+      {
+        "text": "Marcus Brandt",
+        "type": "person"
+      },
+      {
+        "text": "Marcus",
+        "type": "person"
+      },
+      {
+        "text": "Chloe Brandt-Nguyen",
+        "type": "person"
+      },
+      {
+        "text": "Okonkwo & Brandt LLP",
+        "type": "company"
+      },
+      {
+        "text": "Okonkwo & Brandt",
+        "type": "company"
+      },
+      {
+        "text": "Raman Dental Group",
+        "type": "company"
+      },
+      {
+        "text": "18 Granite Street, Suite 22, Providence, RI 02903",
+        "type": "address"
+      },
+      {
+        "text": "3300187765",
+        "type": "financial_id"
+      },
+      {
+        "text": "111000025",
+        "type": "financial_id"
+      },
+      {
+        "text": "(401) 555-0129",
+        "type": "phone"
+      },
+      {
+        "text": "mbrandt@okonkwobrandt.example",
+        "type": "email"
+      }
+    ]
+  },
+  {
+    "id": "will-01",
+    "doc_type": "will and trust clause",
+    "text": "ARTICLE IV - TRUST PROVISIONS\n\nI, Eleanor M. Castellano, being of sound mind, declare this to be my Last Will. I give the residue of my estate to the trustee of the Castellano Family Trust, dated April 12, 2019, to be held for the benefit of my grandchildren. I appoint my son, Anthony Castellano, as trustee, and if he cannot serve, my daughter, Beatriz Castellano-Ruiz. Anthony shall receive $50,000 outright. My friend Zoë Lindgren shall receive my home at 33 Cypress Lane, Savannah, GA 31401. Mrs. Lindgren shall hold it for life. The trustee may retain accounts at Coastal Savings Bank, Account No. 667200145, and shall file returns using the Trust's EIN 58-1122334. My Social Security Number is 245-81-3326. This Will shall be construed under the laws of Georgia.\n\n/s/ Eleanor M. Castellano",
+    "entities": [
+      {
+        "text": "Eleanor M. Castellano",
+        "type": "person"
+      },
+      {
+        "text": "Anthony Castellano",
+        "type": "person"
+      },
+      {
+        "text": "Anthony",
+        "type": "person"
+      },
+      {
+        "text": "Beatriz Castellano-Ruiz",
+        "type": "person"
+      },
+      {
+        "text": "Zoë Lindgren",
+        "type": "person"
+      },
+      {
+        "text": "Lindgren",
+        "type": "person"
+      },
+      {
+        "text": "Castellano Family Trust",
+        "type": "company"
+      },
+      {
+        "text": "Coastal Savings Bank",
+        "type": "company"
+      },
+      {
+        "text": "33 Cypress Lane, Savannah, GA 31401",
+        "type": "address"
+      },
+      {
+        "text": "667200145",
+        "type": "financial_id"
+      },
+      {
+        "text": "58-1122334",
+        "type": "financial_id"
+      },
+      {
+        "text": "245-81-3326",
+        "type": "financial_id"
+      }
+    ]
+  },
+  {
+    "id": "wire-01",
+    "doc_type": "wire instructions",
+    "text": "WIRE INSTRUCTIONS - CONFIDENTIAL\n\nPlease remit the closing funds of $1,125,000.00 on or before February 14, 2025, as follows:\n\nBeneficiary: Sterling Title & Escrow Co.\nBank: Union Harbor Bank\nBank address: 700 Market Street, San Francisco, CA 94103\nRouting number: 121000358\nAccount No. 000123456789\nReference: Escrow 25-0381, Buyer Tobias Lindqvist\n\nBefore sending, call escrow officer Naomi Feldman at (415) 555-0171 to verify. Never rely on emailed changes; Sterling will not alter these instructions by email. Questions may be directed to nfeldman@sterlingtitle.example. Ms. Feldman can also be reached by fax at 415-555-0172. Union Harbor Bank is not responsible for misdirected wires.",
+    "entities": [
+      {
+        "text": "Tobias Lindqvist",
+        "type": "person"
+      },
+      {
+        "text": "Naomi Feldman",
+        "type": "person"
+      },
+      {
+        "text": "Feldman",
+        "type": "person"
+      },
+      {
+        "text": "Sterling Title & Escrow Co.",
+        "type": "company"
+      },
+      {
+        "text": "Sterling",
+        "type": "company"
+      },
+      {
+        "text": "Union Harbor Bank",
+        "type": "company"
+      },
+      {
+        "text": "700 Market Street, San Francisco, CA 94103",
+        "type": "address"
+      },
+      {
+        "text": "121000358",
+        "type": "financial_id"
+      },
+      {
+        "text": "000123456789",
+        "type": "financial_id"
+      },
+      {
+        "text": "(415) 555-0171",
+        "type": "phone"
+      },
+      {
+        "text": "415-555-0172",
+        "type": "phone"
+      },
+      {
+        "text": "nfeldman@sterlingtitle.example",
+        "type": "email"
+      }
+    ]
+  },
+  {
+    "id": "resolution-01",
+    "doc_type": "board resolution",
+    "text": "CERTIFIED RESOLUTION OF THE BOARD OF DIRECTORS\n\nRESOLVED, that Redwood Valley Holdings, Inc. (the \"Corporation\") is authorized to enter into a credit facility with Atlantic Mutual Trust Company in an amount up to $10,000,000; and\n\nRESOLVED FURTHER, that Chairwoman Adaeze Nwosu and Treasurer Samuel P. Whitaker Jr. are each authorized to execute the loan documents on behalf of Redwood Valley; and\n\nRESOLVED FURTHER, that Whitaker shall serve as the signatory on the operating account, Account No. 40091823, and the Corporation's EIN is 91-2468013.\n\nThe undersigned Secretary, Linh Tran, certifies that these resolutions were adopted on September 21, 2025, and remain in effect.\n\nREDWOOD VALLEY HOLDINGS, INC.\nBy: Linh Tran, Secretary\n2200 Cascade Way, Suite 410\nBellevue, WA 98004",
+    "entities": [
+      {
+        "text": "Adaeze Nwosu",
+        "type": "person"
+      },
+      {
+        "text": "Samuel P. Whitaker Jr.",
+        "type": "person"
+      },
+      {
+        "text": "Whitaker",
+        "type": "person"
+      },
+      {
+        "text": "Linh Tran",
+        "type": "person"
+      },
+      {
+        "text": "Redwood Valley Holdings, Inc.",
+        "type": "company"
+      },
+      {
+        "text": "Atlantic Mutual Trust Company",
+        "type": "company"
+      },
+      {
+        "text": "Redwood Valley",
+        "type": "company"
+      },
+      {
+        "text": "REDWOOD VALLEY HOLDINGS, INC.",
+        "type": "company"
+      },
+      {
+        "text": "2200 Cascade Way, Suite 410",
+        "type": "address"
+      },
+      {
+        "text": "Bellevue, WA 98004",
+        "type": "address"
+      },
+      {
+        "text": "40091823",
+        "type": "financial_id"
+      },
+      {
+        "text": "91-2468013",
+        "type": "financial_id"
+      }
+    ]
+  },
+  {
+    "id": "subpoena-01",
+    "doc_type": "subpoena",
+    "text": "SUBPOENA DUCES TECUM\n\nTO: Custodian of Records, Harlan & Pryce Accounting Group\n1180 Elm Street, Suite 700\nKansas City, MO 64106\n\nYOU ARE COMMANDED to produce the documents described in Attachment A at the offices of Vasquez Law Group, 40 Prairie Road, Overland Park, KS 66210, on December 5, 2025, in the matter of Kessler v. Orion Tools Corp., Case No. 25-CV-1893, pending in the District Court of Johnson County, Kansas. The documents concern the tax returns of Dennis Kessler (SSN 318-27-4409) and his wife, Ingrid Kessler, for 2021 through 2023. Ingrid has consented to production. Orion's counsel has been served. Failure to comply may result in contempt under K.S.A. § 60-245. Direct questions to attorney Rosa Vasquez at 913-555-0145.",
+    "entities": [
+      {
+        "text": "Kessler",
+        "type": "person"
+      },
+      {
+        "text": "Dennis Kessler",
+        "type": "person"
+      },
+      {
+        "text": "Ingrid Kessler",
+        "type": "person"
+      },
+      {
+        "text": "Ingrid",
+        "type": "person"
+      },
+      {
+        "text": "Rosa Vasquez",
+        "type": "person"
+      },
+      {
+        "text": "Harlan & Pryce Accounting Group",
+        "type": "company"
+      },
+      {
+        "text": "Vasquez Law Group",
+        "type": "company"
+      },
+      {
+        "text": "Orion Tools Corp.",
+        "type": "company"
+      },
+      {
+        "text": "Orion",
+        "type": "company"
+      },
+      {
+        "text": "1180 Elm Street, Suite 700",
+        "type": "address"
+      },
+      {
+        "text": "Kansas City, MO 64106",
+        "type": "address"
+      },
+      {
+        "text": "40 Prairie Road, Overland Park, KS 66210",
+        "type": "address"
+      },
+      {
+        "text": "318-27-4409",
+        "type": "financial_id"
+      },
+      {
+        "text": "913-555-0145",
+        "type": "phone"
+      }
+    ]
+  },
+  {
+    "id": "email-01",
+    "doc_type": "email between counsel",
+    "text": "From: Julia Brennan <jbrennan@kdlaw.example>\nTo: Wen Zhang <wzhang@zhanglegal.example>\nDate: October 14, 2025\nSubject: Halvorsen - production schedule\n\nWen,\n\nFollowing up on our call, Brennan Kowalski & Dunn LLP will produce the Halvorsen documents by October 28. My client, Carl Halvorsen, is traveling, so please route any scheduling requests for him through my assistant at (720) 555-0113. Mr. Halvorsen's deposition can proceed on November 18 in Denver. Please confirm that Tidewater Biologics will agree to the protective order under Fed. R. Civ. P. 26(c). If Zhang & Associates needs anything further, let me know.\n\nBest,\nJulia\nJulia Brennan | Brennan Kowalski & Dunn LLP\n1600 Larimer Street, Suite 2500, Denver, CO 80202",
+    "entities": [
+      {
+        "text": "Julia Brennan",
+        "type": "person"
+      },
+      {
+        "text": "Wen Zhang",
+        "type": "person"
+      },
+      {
+        "text": "Wen",
+        "type": "person"
+      },
+      {
+        "text": "Halvorsen",
+        "type": "person"
+      },
+      {
+        "text": "Carl Halvorsen",
+        "type": "person"
+      },
+      {
+        "text": "Julia",
+        "type": "person"
+      },
+      {
+        "text": "Brennan Kowalski & Dunn LLP",
+        "type": "company"
+      },
+      {
+        "text": "Tidewater Biologics",
+        "type": "company"
+      },
+      {
+        "text": "Zhang & Associates",
+        "type": "company"
+      },
+      {
+        "text": "1600 Larimer Street, Suite 2500, Denver, CO 80202",
+        "type": "address"
+      },
+      {
+        "text": "(720) 555-0113",
+        "type": "phone"
+      },
+      {
+        "text": "jbrennan@kdlaw.example",
+        "type": "email"
+      },
+      {
+        "text": "wzhang@zhanglegal.example",
+        "type": "email"
+      }
+    ]
+  },
+  {
+    "id": "purchase-01",
+    "doc_type": "purchase agreement notice clause",
+    "text": "Section 12.4 Notices. All notices under this Agreement shall be in writing and delivered personally or by overnight courier to the following addresses:\n\nIf to Seller:\nGrant Industrial Supply, Inc.\nAttn: Walter Grant, President\n3501 Foundry Road\nHouston, TX 77003\nEmail: wgrant@grantindustrial.example\n\nIf to Buyer:\nBlackstone Meadow LLC\nAttn: Imani Brooks-Carter\n95 Riverside Drive, Apt. 12\nNew York, NY 10024\nTelephone: (212) 555-0198\n\nwith a copy (which shall not constitute notice) to Alvarez Mendoza & Cho LLP. Grant Industrial shall deliver the Purchased Assets described in Section 2.1 by April 1, 2026. Any dispute shall be heard by the courts of New York. Ms. Brooks-Carter and Mr. Grant shall each designate a successor.",
+    "entities": [
+      {
+        "text": "Walter Grant",
+        "type": "person"
+      },
+      {
+        "text": "Grant",
+        "type": "person"
+      },
+      {
+        "text": "Imani Brooks-Carter",
+        "type": "person"
+      },
+      {
+        "text": "Brooks-Carter",
+        "type": "person"
+      },
+      {
+        "text": "Grant Industrial Supply, Inc.",
+        "type": "company"
+      },
+      {
+        "text": "Grant Industrial",
+        "type": "company"
+      },
+      {
+        "text": "Blackstone Meadow LLC",
+        "type": "company"
+      },
+      {
+        "text": "Alvarez Mendoza & Cho LLP",
+        "type": "company"
+      },
+      {
+        "text": "3501 Foundry Road",
+        "type": "address"
+      },
+      {
+        "text": "Houston, TX 77003",
+        "type": "address"
+      },
+      {
+        "text": "95 Riverside Drive, Apt. 12",
+        "type": "address"
+      },
+      {
+        "text": "New York, NY 10024",
+        "type": "address"
+      },
+      {
+        "text": "(212) 555-0198",
+        "type": "phone"
+      },
+      {
+        "text": "wgrant@grantindustrial.example",
+        "type": "email"
+      }
+    ]
+  },
+  {
+    "id": "affidavit-01",
+    "doc_type": "affidavit",
+    "text": "AFFIDAVIT OF SERVICE\n\nSTATE OF FLORIDA )\nCOUNTY OF ORANGE ) ss.\n\nI, Deborah A. Quintero, being duly sworn, state: I am over eighteen and not a party to this action. On August 19, 2025, at 2:15 p.m., I served the Summons and Complaint in Case No. 2025-CA-006712 upon Coral Springs Pharmacy Inc. by delivering copies to its registered agent, Mr. Étienne Beaumont, at 4400 Palmetto Parkway, Orlando, FL 32801. Mr. Beaumont stated that Coral Springs would respond within twenty days. I also mailed a copy to its owner, Ravi Patel, at PO Box 1127, Orlando, FL 32802. Patel's telephone is 407-555-0152. I declare under penalty of perjury under 28 U.S.C. § 1746 that the foregoing is true.\n\nDeborah Quintero\nDEBORAH A. QUINTERO",
+    "entities": [
+      {
+        "text": "Deborah A. Quintero",
+        "type": "person"
+      },
+      {
+        "text": "Deborah Quintero",
+        "type": "person"
+      },
+      {
+        "text": "DEBORAH A. QUINTERO",
+        "type": "person"
+      },
+      {
+        "text": "Étienne Beaumont",
+        "type": "person"
+      },
+      {
+        "text": "Beaumont",
+        "type": "person"
+      },
+      {
+        "text": "Ravi Patel",
+        "type": "person"
+      },
+      {
+        "text": "Patel",
+        "type": "person"
+      },
+      {
+        "text": "Coral Springs Pharmacy Inc.",
+        "type": "company"
+      },
+      {
+        "text": "Coral Springs",
+        "type": "company"
+      },
+      {
+        "text": "4400 Palmetto Parkway, Orlando, FL 32801",
+        "type": "address"
+      },
+      {
+        "text": "PO Box 1127, Orlando, FL 32802",
+        "type": "address"
+      },
+      {
+        "text": "407-555-0152",
+        "type": "phone"
+      }
+    ]
+  }
+]

@@ -121,6 +121,78 @@ def test_adjacent_address_parts_merge_into_one_address():
     assert values(proposal) == {"[ADDRESS_1]": "742 Evergreen Terrace, Springfield, IL 62704"}
 
 
+def test_first_name_alone_is_caught_and_linked():
+    text = "Maria Q. Delgado signed. Maria agrees. Ms. Delgado's copy. Mariana did not."
+    proposal = scan_text(text, ner=fake_ner(person=["Maria Q. Delgado"]))
+    assert values(proposal) == {
+        "[PERSON_1]": "Maria Q. Delgado",
+        "[PERSON_1_ALIAS_1]": "Maria",
+        "[PERSON_1_ALIAS_2]": "Delgado",
+    }
+    vault = merge_vault(None, proposal["proposed"])
+    assert apply_vault(text, vault) == (
+        "[PERSON_1] signed. [PERSON_1_ALIAS_1] agrees. Ms. [PERSON_1_ALIAS_2]'s copy. Mariana did not."
+    )
+
+
+def test_shared_first_name_is_not_linked_to_either_person():
+    text = "Anna Lee and Anna Ruiz met. Anna spoke."
+    proposal = scan_text(text, ner=fake_ner(person=["Anna Lee", "Anna Ruiz"]))
+    assert proposal["proposed"]["[PERSON_3]"]["value"] == "Anna"
+
+
+def test_company_leading_words_are_caught_and_linked_to_the_full_name():
+    text = "Cedar Ridge Properties LLC leases to Lumen Health. Cedar Ridge agrees. Cedar is a tree."
+    proposal = scan_text(text, ner=fake_ner(company=["Lumen Health"]))
+    by_value = {e["value"]: e["entity"] for e in proposal["proposed"].values()}
+    assert by_value["Cedar Ridge"] == by_value["Cedar Ridge Properties LLC"]
+    assert by_value["Cedar"] == by_value["Cedar Ridge Properties LLC"]
+    assert by_value["Lumen Health"] != by_value["Cedar Ridge"]
+    vault = merge_vault(None, proposal["proposed"])
+    assert rehydrate_text(apply_vault(text, vault), vault) == text
+
+
+def test_generic_leading_word_is_not_treated_as_the_company():
+    text = "First Prairie Bank, N.A. holds the note. First, the parties agree."
+    proposal = scan_text(text, ner=False)
+    assert "First" not in {e["value"] for e in proposal["proposed"].values()}
+
+
+def test_short_form_shared_by_two_companies_gets_its_own_entity():
+    text = "Orion Tools Corp. and Orion Freight LLC merged. Orion survives."
+    proposal = scan_text(text, ner=False)
+    by_value = {e["value"]: e["entity"] for e in proposal["proposed"].values()}
+    assert len({by_value["Orion Tools Corp."], by_value["Orion Freight LLC"], by_value["Orion"]}) == 3
+
+
+@pytest.mark.parametrize("term", ["Employee", "the Borrower", "Landlord", "The Company"])
+def test_defined_terms_are_not_treated_as_names(term):
+    text = f"{term} shall notify Jane Doe."
+    ner = fake_ner(person=[term, "Jane Doe"], company=[term])
+    assert values(scan_text(text, ner=ner)) == {"[PERSON_1]": "Jane Doe"}
+
+
+def test_courts_and_lowercase_entity_descriptions_are_not_companies():
+    text = "Acme Works LLC, a Delaware limited liability company, sued in the Court of Common Pleas."
+    proposal = scan_text(text, ner=fake_ner(company=["Court of Common Pleas"]))
+    assert values(proposal) == {"[COMPANY_1]": "Acme Works LLC"}
+
+
+def test_firm_names_without_a_legal_suffix():
+    text = "Counsel at Zhang & Associates and Harlan Pryce Accounting Group replied."
+    hits = [text[d.start : d.end] for d in detect_regex(text) if d.type == "company"]
+    assert hits == ["Zhang & Associates", "Harlan Pryce Accounting Group"]
+
+
+def test_city_state_zip_is_detected_and_joined_to_the_street():
+    text = "Send to 500 Alder Avenue, Floor 9, Denver, CO 80202 or to Kansas City, MO 64106-1234."
+    proposal = scan_text(text, ner=fake_ner(address=["500 Alder Avenue, Floor 9"]))
+    assert values(proposal) == {
+        "[ADDRESS_1]": "500 Alder Avenue, Floor 9, Denver, CO 80202",
+        "[ADDRESS_2]": "Kansas City, MO 64106-1234",
+    }
+
+
 def test_ssn_and_ein_with_the_same_digits_are_different_ids():
     proposal = scan_text("EIN 12-3456789 and SSN 123-45-6789", ner=False)
     assert set(proposal["proposed"]) == {"[FINANCIAL_ID_1]", "[FINANCIAL_ID_2]"}
