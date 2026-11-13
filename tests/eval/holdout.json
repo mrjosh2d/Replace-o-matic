@@ -1,0 +1,724 @@
+[
+ {
+  "id": "poa-01",
+  "doc_type": "power of attorney",
+  "text": "DURABLE POWER OF ATTORNEY\n\nKNOW ALL PERSONS BY THESE PRESENTS: I, Maria Q. Delgado, of 4471 Larkspur Terrace, Apt. 12B, Tucson, Arizona 85712 (SSN 900-41-7782), hereby appoint my nephew, Thaddeus van der Meer III, as my attorney-in-fact pursuant to A.R.S. § 14-5501. Mr. van der Meer may be reached at 88 Quarry Hill Road, Flagstaff, AZ 86001, by telephone at (928) 555-0143, or by email at t.vandermeer@quillbrook-mail.example.\n\nMy attorney-in-fact is authorized to manage my accounts at Saguaro Federal Credit Union, including checking account no. 3380-117-9022 and the savings account ending in 4410, and to act on behalf of the Delgado Family Revocable Trust, of which I am settlor. If Thaddeus is unable or unwilling to serve, I appoint my friend Dr. Ngozi Adebayo-Reyes as successor. Ms. Adebayo-Reyes shall have the same powers.\n\nThis power of attorney shall not be affected by my subsequent disability or incapacity. Dated this 3rd day of March, 2024, in Pima County, Arizona.\n\n/s/ Maria Q. Delgado\nMARIA Q. DELGADO, Principal\n\nSubscribed and sworn before me by the Principal. Rosalind K. O'Hearn, Notary Public. My commission expires June 1, 2027.",
+  "entities": [
+   {
+    "text": "Maria Q. Delgado",
+    "type": "person"
+   },
+   {
+    "text": "MARIA Q. DELGADO",
+    "type": "person"
+   },
+   {
+    "text": "Thaddeus van der Meer III",
+    "type": "person"
+   },
+   {
+    "text": "van der Meer",
+    "type": "person"
+   },
+   {
+    "text": "Thaddeus",
+    "type": "person"
+   },
+   {
+    "text": "Ngozi Adebayo-Reyes",
+    "type": "person"
+   },
+   {
+    "text": "Adebayo-Reyes",
+    "type": "person"
+   },
+   {
+    "text": "Rosalind K. O'Hearn",
+    "type": "person"
+   },
+   {
+    "text": "4471 Larkspur Terrace, Apt. 12B, Tucson, Arizona 85712",
+    "type": "address"
+   },
+   {
+    "text": "88 Quarry Hill Road, Flagstaff, AZ 86001",
+    "type": "address"
+   },
+   {
+    "text": "900-41-7782",
+    "type": "financial_id"
+   },
+   {
+    "text": "3380-117-9022",
+    "type": "financial_id"
+   },
+   {
+    "text": "4410",
+    "type": "financial_id"
+   },
+   {
+    "text": "(928) 555-0143",
+    "type": "phone"
+   },
+   {
+    "text": "t.vandermeer@quillbrook-mail.example",
+    "type": "email"
+   },
+   {
+    "text": "Saguaro Federal Credit Union",
+    "type": "company"
+   },
+   {
+    "text": "Delgado Family Revocable Trust",
+    "type": "company"
+   }
+  ]
+ },
+ {
+  "id": "lien-01",
+  "doc_type": "mechanic's lien notice",
+  "text": "NOTICE AND CLAIM OF MECHANIC'S LIEN\n\nTO: Harlan & Prewitt Holdings, Inc., and Mr. Cornelius J. Prewitt-Nakamura, Owner\nProperty: 1209 Old Mill Pike, Unit C, Lexington, Kentucky 40505\n\nTake notice that Ironbark Mechanical (d/b/a Ironbark Heating & Air), a sole proprietorship of Wendell Tran, furnished labor and materials to the above property under a written contract dated August 14, 2025, pursuant to KRS 376.010. Ironbark's federal EIN is 84-3920175. Payments should be directed to the lienor, c/o Wendell Tran, P.O. Box 2290, Frankfort, KY 40602, or call (502) 555-0188.\n\nThe unpaid balance is $48,317.50, exclusive of interest. Mr. Tran states that the general contractor, Bluegrass Builders LLC, accepted the work on October 2, 2025, and has refused payment despite demand. Harlan & Prewitt has not disputed that the work was performed. Prewitt-Nakamura's counsel, Ellery Fontaine of Fontaine Whitcomb LLP, was served on November 3.\n\nThis lien is claimed against the Property and against HARLAN & PREWITT HOLDINGS, INC. only to the extent permitted by Chapter 376 of the Kentucky Revised Statutes.\n\nIronbark Mechanical\nBy: Wendell Tran, Owner\nRemit to Commonwealth Trust Bank, routing 010203047, acct. 7710046238",
+  "entities": [
+   {
+    "text": "Harlan & Prewitt Holdings, Inc.",
+    "type": "company"
+   },
+   {
+    "text": "Harlan & Prewitt",
+    "type": "company"
+   },
+   {
+    "text": "HARLAN & PREWITT HOLDINGS, INC.",
+    "type": "company"
+   },
+   {
+    "text": "Ironbark Mechanical",
+    "type": "company"
+   },
+   {
+    "text": "Ironbark Heating & Air",
+    "type": "company"
+   },
+   {
+    "text": "Ironbark",
+    "type": "company"
+   },
+   {
+    "text": "Bluegrass Builders LLC",
+    "type": "company"
+   },
+   {
+    "text": "Fontaine Whitcomb LLP",
+    "type": "company"
+   },
+   {
+    "text": "Commonwealth Trust Bank",
+    "type": "company"
+   },
+   {
+    "text": "Cornelius J. Prewitt-Nakamura",
+    "type": "person"
+   },
+   {
+    "text": "Prewitt-Nakamura",
+    "type": "person"
+   },
+   {
+    "text": "Wendell Tran",
+    "type": "person"
+   },
+   {
+    "text": "Tran",
+    "type": "person"
+   },
+   {
+    "text": "Ellery Fontaine",
+    "type": "person"
+   },
+   {
+    "text": "1209 Old Mill Pike, Unit C, Lexington, Kentucky 40505",
+    "type": "address"
+   },
+   {
+    "text": "P.O. Box 2290, Frankfort, KY 40602",
+    "type": "address"
+   },
+   {
+    "text": "84-3920175",
+    "type": "financial_id"
+   },
+   {
+    "text": "010203047",
+    "type": "financial_id"
+   },
+   {
+    "text": "7710046238",
+    "type": "financial_id"
+   },
+   {
+    "text": "(502) 555-0188",
+    "type": "phone"
+   }
+  ]
+ },
+ {
+  "id": "arb-01",
+  "doc_type": "arbitration demand",
+  "text": "DEMAND FOR ARBITRATION\nAmerican Arbitration Association, Commercial Arbitration Rules\nAAA Case No. 01-25-0004-7731\n\nClaimant: Pacifica Nutraceuticals Ltd. (\"Claimant\"), 2200 Harbourfront Way, Suite 900, Vancouver, BC V6B 1A1, Canada, represented by Priyanka Venkataraman, Esq., Oyelaran, Schmidt & Lindqvist PC, 410 Fifth Avenue, 22nd Floor, New York, New York 10018, tel. 212-555-0166, pvenkataraman@osl-law.example.\n\nRespondent: Dunmore-Kessler Distribution Group, a Delaware corporation (\"Respondent\"), whose principal officer is Gerard F. Dunmore-Kessler, Jr.\n\nNature of dispute: Claimant alleges that Respondent breached Section 7.2 of the Exclusive Distribution Agreement dated January 9, 2023 by failing to remit royalties. Claimant seeks $1,284,000 plus fees. Pacifica's invoices were paid by wire to Respondent's account at First Meridian Bank (account no. 5530 8841 2207, ABA 000222333). Respondent's counsel has not answered, and Mr. Dunmore-Kessler himself ignored two letters, though Gerry did call once. PACIFICA NUTRACEUTICALS LTD. demands a hearing in Chicago, Illinois, before three arbitrators. Ms. Venkataraman will appear for Claimant.",
+  "entities": [
+   {
+    "text": "Pacifica Nutraceuticals Ltd.",
+    "type": "company"
+   },
+   {
+    "text": "Pacifica",
+    "type": "company"
+   },
+   {
+    "text": "PACIFICA NUTRACEUTICALS LTD.",
+    "type": "company"
+   },
+   {
+    "text": "Dunmore-Kessler Distribution Group",
+    "type": "company"
+   },
+   {
+    "text": "Oyelaran, Schmidt & Lindqvist PC",
+    "type": "company"
+   },
+   {
+    "text": "First Meridian Bank",
+    "type": "company"
+   },
+   {
+    "text": "Priyanka Venkataraman",
+    "type": "person"
+   },
+   {
+    "text": "Venkataraman",
+    "type": "person"
+   },
+   {
+    "text": "Gerard F. Dunmore-Kessler, Jr.",
+    "type": "person"
+   },
+   {
+    "text": "Dunmore-Kessler",
+    "type": "person"
+   },
+   {
+    "text": "Gerry",
+    "type": "person"
+   },
+   {
+    "text": "2200 Harbourfront Way, Suite 900, Vancouver, BC V6B 1A1, Canada",
+    "type": "address"
+   },
+   {
+    "text": "410 Fifth Avenue, 22nd Floor, New York, New York 10018",
+    "type": "address"
+   },
+   {
+    "text": "212-555-0166",
+    "type": "phone"
+   },
+   {
+    "text": "pvenkataraman@osl-law.example",
+    "type": "email"
+   },
+   {
+    "text": "5530 8841 2207",
+    "type": "financial_id"
+   },
+   {
+    "text": "000222333",
+    "type": "financial_id"
+   }
+  ]
+ },
+ {
+  "id": "shareholder-01",
+  "doc_type": "shareholder agreement excerpt",
+  "text": "SECTION 4.3 Right of First Refusal. If any Shareholder (a \"Selling Shareholder\") proposes to Transfer any Shares to a third party, the Selling Shareholder shall first give written notice to the Company and to each other Shareholder. Notices shall be sent to the addresses set forth on Schedule A, including: Brightwater Ventures II, L.P., 700 Montgomery Street, San Francisco, CA 94111, Attn: Hiroshi Tanabe-Whitfield; Sofia de la Cruz, 15 Alder Lane, Austin, Texas 78704; and Tessellate Robotics, Inc. (the \"Company\"), 3 Foundry Row, Cambridge, MA 02139.\n\nEach Shareholder shall have thirty (30) days to elect to purchase its pro rata share. Brightwater shall be entitled to purchase any shares not taken up by de la Cruz. Notwithstanding the foregoing, transfers by Ms. de la Cruz to the Cruz-Okonkwo Family Trust, for which Sofia serves as trustee, or to Tessellate's employee option pool, are Permitted Transfers. Mr. Tanabe-Whitfield acknowledges that Section 202 of the Delaware General Corporation Law applies. TESSELLATE ROBOTICS, INC. shall maintain the register. The Company's federal EIN, 47-2216039, shall appear on all filings made by Sheikh Abdul-Rahman, as corporate secretary.",
+  "entities": [
+   {
+    "text": "Brightwater Ventures II, L.P.",
+    "type": "company"
+   },
+   {
+    "text": "Brightwater",
+    "type": "company"
+   },
+   {
+    "text": "Tessellate Robotics, Inc.",
+    "type": "company"
+   },
+   {
+    "text": "Tessellate",
+    "type": "company"
+   },
+   {
+    "text": "TESSELLATE ROBOTICS, INC.",
+    "type": "company"
+   },
+   {
+    "text": "Cruz-Okonkwo Family Trust",
+    "type": "company"
+   },
+   {
+    "text": "Hiroshi Tanabe-Whitfield",
+    "type": "person"
+   },
+   {
+    "text": "Tanabe-Whitfield",
+    "type": "person"
+   },
+   {
+    "text": "Sofia de la Cruz",
+    "type": "person"
+   },
+   {
+    "text": "de la Cruz",
+    "type": "person"
+   },
+   {
+    "text": "Sofia",
+    "type": "person"
+   },
+   {
+    "text": "Sheikh Abdul-Rahman",
+    "type": "person"
+   },
+   {
+    "text": "700 Montgomery Street, San Francisco, CA 94111",
+    "type": "address"
+   },
+   {
+    "text": "15 Alder Lane, Austin, Texas 78704",
+    "type": "address"
+   },
+   {
+    "text": "3 Foundry Row, Cambridge, MA 02139",
+    "type": "address"
+   },
+   {
+    "text": "47-2216039",
+    "type": "financial_id"
+   }
+  ]
+ },
+ {
+  "id": "cd-01",
+  "doc_type": "cease-and-desist letter",
+  "text": "VIA EMAIL AND FEDEX\nNovember 10, 2025\n\nBriar & Thistle Candle Co.\nAttn: Ms. Annelise Fjeldstad-Moore\n5518 Dogwood Parkway\nAsheville, NC 28801\n\nRe: Unauthorized use of our client's registered trademark\n\nDear Ms. Fjeldstad-Moore:\n\nThis firm represents Moonleaf Botanicals, LLC (\"Moonleaf\"). Moonleaf owns U.S. Trademark Reg. No. 5,771,204 and has used its mark continuously since 2016. It has come to our attention that Briar & Thistle is selling soy candles bearing a confusingly similar name on its website and through social media. Such use is likely to cause confusion under 15 U.S.C. § 1114 and Lanham Act § 43(a).\n\nMoonleaf demands that Briar & Thistle cease all such use within fourteen (14) days. Please contact me directly at (919) 555-0127 or lkowalczyk@harrowgate-law.example. This letter is not a complete statement of Moonleaf's rights, all of which are reserved.\n\nVery truly yours,\n\nLeopold Kowalczyk\nHARROWGATE & VOSS, P.A.\n\ncc: Dr. Imani Washington-Bell, Moonleaf Botanicals, LLC, 902 Peachtree Court, Suite 4, Decatur, GA 30030",
+  "entities": [
+   {
+    "text": "Briar & Thistle Candle Co.",
+    "type": "company"
+   },
+   {
+    "text": "Briar & Thistle",
+    "type": "company"
+   },
+   {
+    "text": "Moonleaf Botanicals, LLC",
+    "type": "company"
+   },
+   {
+    "text": "Moonleaf",
+    "type": "company"
+   },
+   {
+    "text": "HARROWGATE & VOSS, P.A.",
+    "type": "company"
+   },
+   {
+    "text": "Annelise Fjeldstad-Moore",
+    "type": "person"
+   },
+   {
+    "text": "Fjeldstad-Moore",
+    "type": "person"
+   },
+   {
+    "text": "Leopold Kowalczyk",
+    "type": "person"
+   },
+   {
+    "text": "Imani Washington-Bell",
+    "type": "person"
+   },
+   {
+    "text": "5518 Dogwood Parkway",
+    "type": "address"
+   },
+   {
+    "text": "Asheville, NC 28801",
+    "type": "address"
+   },
+   {
+    "text": "902 Peachtree Court, Suite 4, Decatur, GA 30030",
+    "type": "address"
+   },
+   {
+    "text": "(919) 555-0127",
+    "type": "phone"
+   },
+   {
+    "text": "lkowalczyk@harrowgate-law.example",
+    "type": "email"
+   }
+  ]
+ },
+ {
+  "id": "hipaa-01",
+  "doc_type": "HIPAA records release authorization",
+  "text": "AUTHORIZATION FOR RELEASE OF PROTECTED HEALTH INFORMATION\n(45 C.F.R. § 164.508)\n\nPatient: Rashad L. Whitcombe-Ali    DOB: 04/17/1981    SSN: 900-77-1204\nMRN: HM-0066412\nPatient address: 2740 Cypress Bend Drive, Unit 6, Baton Rouge, LA 70808\nPatient phone: (225) 555-0172\n\nI, Rashad L. Whitcombe-Ali, authorize Riverbend Orthopedic Associates, PLLC, and its treating physician, Dr. Eleanor Brandvold-Sato, to disclose my complete medical records, including imaging, billing and physical therapy notes, to my attorney, Terrence Obuya, Esq., of Obuya & Lindgren, 1180 Convention Street, Suite 300, Baton Rouge, Louisiana 70802 (fax 225-555-0199). Health plan: Gulf Coast Mutual Health, Member ID GCM 884-20-1167. Records may also be sent to Dr. Brandvold-Sato's colleague, Dr. Yusuf Haddad, for a second opinion.\n\nThis authorization expires one year from the date signed. Mr. Whitcombe-Ali may revoke it in writing at any time, except to the extent action has already been taken in reliance on it. Treatment is not conditioned on signing.",
+  "entities": [
+   {
+    "text": "Rashad L. Whitcombe-Ali",
+    "type": "person"
+   },
+   {
+    "text": "Whitcombe-Ali",
+    "type": "person"
+   },
+   {
+    "text": "Eleanor Brandvold-Sato",
+    "type": "person"
+   },
+   {
+    "text": "Brandvold-Sato",
+    "type": "person"
+   },
+   {
+    "text": "Terrence Obuya",
+    "type": "person"
+   },
+   {
+    "text": "Yusuf Haddad",
+    "type": "person"
+   },
+   {
+    "text": "Riverbend Orthopedic Associates, PLLC",
+    "type": "company"
+   },
+   {
+    "text": "Obuya & Lindgren",
+    "type": "company"
+   },
+   {
+    "text": "Gulf Coast Mutual Health",
+    "type": "company"
+   },
+   {
+    "text": "2740 Cypress Bend Drive, Unit 6, Baton Rouge, LA 70808",
+    "type": "address"
+   },
+   {
+    "text": "1180 Convention Street, Suite 300, Baton Rouge, Louisiana 70802",
+    "type": "address"
+   },
+   {
+    "text": "(225) 555-0172",
+    "type": "phone"
+   },
+   {
+    "text": "225-555-0199",
+    "type": "phone"
+   },
+   {
+    "text": "900-77-1204",
+    "type": "financial_id"
+   },
+   {
+    "text": "HM-0066412",
+    "type": "financial_id"
+   },
+   {
+    "text": "GCM 884-20-1167",
+    "type": "financial_id"
+   }
+  ]
+ },
+ {
+  "id": "rog-01",
+  "doc_type": "interrogatory responses",
+  "text": "PLAINTIFF'S RESPONSES TO DEFENDANT'S FIRST SET OF INTERROGATORIES\nCase No. 2:24-cv-01873-JLR (W.D. Wash.)\n\nINTERROGATORY NO. 3: Identify each person with knowledge of the facts alleged in the Complaint.\n\nRESPONSE: Subject to the General Objections, Plaintiff Oluwaseun Adeyemi-Park (\"Plaintiff\") identifies: (a) himself, contactable only through undersigned counsel; (b) Nadia Petrovic-Hale, Plaintiff's former supervisor at Cascadia Freight Systems, Inc., last known address 3306 NE 45th Street, Seattle, WA 98105, telephone (206) 555-0134; (c) Bartholomew J. Quinlan IV, human resources director at Cascadia Freight; and (d) Dr. Mei-Ling Zhou of Evergreen Behavioral Health, a nonprofit clinic. Ms. Petrovic-Hale witnessed the March 2024 meeting. Mr. Quinlan did not attend, although Quinlan signed the termination memo. Seun testified at deposition that CASCADIA FREIGHT SYSTEMS had never disciplined him.\n\nINTERROGATORY NO. 4: State your Social Security number and the account into which wages were deposited.\n\nRESPONSE: Plaintiff objects on relevance grounds but responds: SSN 900-23-5568; wages were deposited at Puget Sound Savings Bank, account no. 100238847, routing no. 325099001. Mr. Adeyemi-Park's payroll records are held by Cascadia.",
+  "entities": [
+   {
+    "text": "Oluwaseun Adeyemi-Park",
+    "type": "person"
+   },
+   {
+    "text": "Adeyemi-Park",
+    "type": "person"
+   },
+   {
+    "text": "Nadia Petrovic-Hale",
+    "type": "person"
+   },
+   {
+    "text": "Petrovic-Hale",
+    "type": "person"
+   },
+   {
+    "text": "Bartholomew J. Quinlan IV",
+    "type": "person"
+   },
+   {
+    "text": "Quinlan",
+    "type": "person"
+   },
+   {
+    "text": "Mei-Ling Zhou",
+    "type": "person"
+   },
+   {
+    "text": "Seun",
+    "type": "person"
+   },
+   {
+    "text": "Cascadia Freight Systems, Inc.",
+    "type": "company"
+   },
+   {
+    "text": "Cascadia Freight",
+    "type": "company"
+   },
+   {
+    "text": "CASCADIA FREIGHT SYSTEMS",
+    "type": "company"
+   },
+   {
+    "text": "Cascadia",
+    "type": "company"
+   },
+   {
+    "text": "Evergreen Behavioral Health",
+    "type": "company"
+   },
+   {
+    "text": "Puget Sound Savings Bank",
+    "type": "company"
+   },
+   {
+    "text": "3306 NE 45th Street, Seattle, WA 98105",
+    "type": "address"
+   },
+   {
+    "text": "(206) 555-0134",
+    "type": "phone"
+   },
+   {
+    "text": "900-23-5568",
+    "type": "financial_id"
+   },
+   {
+    "text": "100238847",
+    "type": "financial_id"
+   },
+   {
+    "text": "325099001",
+    "type": "financial_id"
+   }
+  ]
+ },
+ {
+  "id": "escrow-01",
+  "doc_type": "escrow closing letter",
+  "text": "PINNACLE TITLE & ESCROW, INC.\nEscrow No. PTE-2025-10882\nOctober 28, 2025\n\nAlejandro and Beatriz Montoya-Ferreira\n19 Wren Hollow Lane\nBoulder, CO 80304\n\nRe: Purchase of 6045 Switchback Road, Nederland, CO 80466 from Walter J. Szymanski\n\nDear Alejandro and Beatriz:\n\nThis confirms that closing occurred today and all funds were disbursed. Your lender, Front Range Community Bank, N.A., wired $412,600 on your behalf. The seller's net proceeds of $371,280.44 were wired to the trust account of Ruiz & Abernathy, P.C., acct. no. 8820-004417, ABA 307070115, as directed by the personal representative, Delphine Okonkwo-Brandt. Ms. Montoya-Ferreira's earnest money of $10,000 was credited at closing. Pinnacle will record the deed with the Boulder County Clerk and Recorder. The seller's taxpayer ID, 84-6120938, will appear on Form 1099-S.\n\nIf you have questions, call me at 303-555-0118 or write to closing@pinnacletitle-escrow.example. Congratulations, Alejandro and Beatriz.\n\nSincerely,\n\nJoaquin P. Strand\nEscrow Officer",
+  "entities": [
+   {
+    "text": "PINNACLE TITLE & ESCROW, INC.",
+    "type": "company"
+   },
+   {
+    "text": "Pinnacle",
+    "type": "company"
+   },
+   {
+    "text": "Front Range Community Bank, N.A.",
+    "type": "company"
+   },
+   {
+    "text": "Ruiz & Abernathy, P.C.",
+    "type": "company"
+   },
+   {
+    "text": "Alejandro",
+    "type": "person"
+   },
+   {
+    "text": "Beatriz",
+    "type": "person"
+   },
+   {
+    "text": "Montoya-Ferreira",
+    "type": "person"
+   },
+   {
+    "text": "Walter J. Szymanski",
+    "type": "person"
+   },
+   {
+    "text": "Delphine Okonkwo-Brandt",
+    "type": "person"
+   },
+   {
+    "text": "Joaquin P. Strand",
+    "type": "person"
+   },
+   {
+    "text": "19 Wren Hollow Lane",
+    "type": "address"
+   },
+   {
+    "text": "Boulder, CO 80304",
+    "type": "address"
+   },
+   {
+    "text": "6045 Switchback Road, Nederland, CO 80466",
+    "type": "address"
+   },
+   {
+    "text": "8820-004417",
+    "type": "financial_id"
+   },
+   {
+    "text": "307070115",
+    "type": "financial_id"
+   },
+   {
+    "text": "84-6120938",
+    "type": "financial_id"
+   },
+   {
+    "text": "303-555-0118",
+    "type": "phone"
+   },
+   {
+    "text": "closing@pinnacletitle-escrow.example",
+    "type": "email"
+   }
+  ]
+ },
+ {
+  "id": "guaranty-01",
+  "doc_type": "guaranty",
+  "text": "CONTINUING GUARANTY\n\nThis Continuing Guaranty (this \"Guaranty\") is made as of June 1, 2025, by Vikram S. Chaudhry-Lindholm, an individual residing at 2290 Heron Point Road, Naples, FL 34102 (the \"Guarantor\"), in favor of Gulfstream Capital Bank, N.A. (the \"Lender\").\n\n1. Guaranty. In consideration of the Lender's extension of a $2,500,000 revolving line of credit to Sunrise Mobility Solutions LLC, a Florida limited liability company (the \"Borrower\"), the Guarantor absolutely and unconditionally guarantees payment when due of all obligations of the Borrower under the Loan Agreement.\n\n2. Representations. The Guarantor represents that his taxpayer identification number is 900-56-2210, that he maintains a personal operating account, no. 6150219983, at Coral Ridge Savings & Loan, and that Chaudhry-Lindholm is not a party to any pending proceeding other than Hollis v. Marchetti, 412 So. 3d 880 (Fla. 2d DCA 2024).\n\n3. Notices. Notices to the Lender shall be sent to 100 Biscayne Plaza, Miami, Florida 33131, Attention: Lourdes Echeverría-Pratt, and to the Guarantor at the address above or by email to vchaudhry@lindholm-holdings.example. SUNRISE MOBILITY SOLUTIONS LLC and its affiliate, Sunrise Mobility, shall furnish financial statements on request.",
+  "entities": [
+   {
+    "text": "Vikram S. Chaudhry-Lindholm",
+    "type": "person"
+   },
+   {
+    "text": "Chaudhry-Lindholm",
+    "type": "person"
+   },
+   {
+    "text": "Lourdes Echeverría-Pratt",
+    "type": "person"
+   },
+   {
+    "text": "Gulfstream Capital Bank, N.A.",
+    "type": "company"
+   },
+   {
+    "text": "Sunrise Mobility Solutions LLC",
+    "type": "company"
+   },
+   {
+    "text": "SUNRISE MOBILITY SOLUTIONS LLC",
+    "type": "company"
+   },
+   {
+    "text": "Sunrise Mobility",
+    "type": "company"
+   },
+   {
+    "text": "Coral Ridge Savings & Loan",
+    "type": "company"
+   },
+   {
+    "text": "2290 Heron Point Road, Naples, FL 34102",
+    "type": "address"
+   },
+   {
+    "text": "100 Biscayne Plaza, Miami, Florida 33131",
+    "type": "address"
+   },
+   {
+    "text": "900-56-2210",
+    "type": "financial_id"
+   },
+   {
+    "text": "6150219983",
+    "type": "financial_id"
+   },
+   {
+    "text": "vchaudhry@lindholm-holdings.example",
+    "type": "email"
+   }
+  ]
+ },
+ {
+  "id": "trial-01",
+  "doc_type": "trial transcript excerpt",
+  "text": "DIRECT EXAMINATION\n\nTHE COURT: Mr. Okafor, you may proceed.\n\nMR. OKAFOR: Thank you, Your Honor. Ms. Lindqvist-Ramos, please state your full name for the record.\n\nTHE WITNESS: Karin Lindqvist-Ramos.\n\nMR. OKAFOR: And your address, ma'am?\n\nTHE WITNESS: 7714 Sycamore Ridge Court, Sacramento, California 95831.\n\nMR. OKAFOR: Directing your attention to Plaintiff's Exhibit 14, the wire confirmation. Is that your account at Golden Valley Credit Union, number 4402981156?\n\nTHE WITNESS: Yes. It's the joint account with my husband, Desmond.\n\nMS. DUBOIS-HARTLEY: Objection, foundation. Ms. Lindqvist-Ramos has not shown that anyone received the wire.\n\nTHE COURT: Overruled. See Cal. Evid. Code § 1271. The witness may answer.\n\nTHE WITNESS: Dr. Pettigrew's office at Pettigrew Orthodontics, Inc. confirmed it by phone, at (916) 555-0149. PETTIGREW ORTHODONTICS had been paid in full by the following Tuesday.\n\nMR. OKAFOR: Nothing further at this time, Your Honor.",
+  "entities": [
+   {
+    "text": "Okafor",
+    "type": "person"
+   },
+   {
+    "text": "OKAFOR",
+    "type": "person"
+   },
+   {
+    "text": "Lindqvist-Ramos",
+    "type": "person"
+   },
+   {
+    "text": "Karin Lindqvist-Ramos",
+    "type": "person"
+   },
+   {
+    "text": "Desmond",
+    "type": "person"
+   },
+   {
+    "text": "DUBOIS-HARTLEY",
+    "type": "person"
+   },
+   {
+    "text": "Pettigrew",
+    "type": "person"
+   },
+   {
+    "text": "Golden Valley Credit Union",
+    "type": "company"
+   },
+   {
+    "text": "Pettigrew Orthodontics, Inc.",
+    "type": "company"
+   },
+   {
+    "text": "PETTIGREW ORTHODONTICS",
+    "type": "company"
+   },
+   {
+    "text": "7714 Sycamore Ridge Court, Sacramento, California 95831",
+    "type": "address"
+   },
+   {
+    "text": "4402981156",
+    "type": "financial_id"
+   },
+   {
+    "text": "(916) 555-0149",
+    "type": "phone"
+   }
+  ]
+ }
+]

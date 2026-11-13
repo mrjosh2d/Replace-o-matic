@@ -1,0 +1,4 @@
+gliner[onnx]>=0.2.30
+cryptography>=42
+pypdf>=4
+lxml>=5
