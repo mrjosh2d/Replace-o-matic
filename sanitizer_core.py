@@ -319,6 +319,53 @@ _DEFINED_TERMS = {
     "undersigned", "vendor", "witness",
 }  # fmt: skip
 
+# Vocabulary that legal drafting capitalises without naming anyone: roles,
+# offices, trust and share labels, statutes and agencies. A span made only of
+# these words (plus function words) is a defined term, not a name.
+_LEGAL_VOCABULARY = _DEFINED_TERMS | {
+    "administrator", "administrative", "advisor", "adviser", "appraiser", "attorney", "fact",
+    "beneficiary", "board", "chairman", "chief", "child", "children", "co", "conservator",
+    "corporate", "custodian", "deceased", "decedent", "descendant", "designated", "director",
+    "doctor", "donor", "entity", "estate", "executive", "exempt", "nonexempt", "family",
+    "fiduciary", "fiduciaries", "financial", "first", "second", "third", "one", "two", "fund",
+    "governmental", "authority", "guardian", "heir", "husband", "wife", "spouse", "incapacitated",
+    "independent", "individual", "initial", "institution", "insured", "interested", "investment",
+    "legal", "living", "manager", "managing", "marital", "non", "member", "nominee", "officer",
+    "operating", "partner", "person", "personal", "president", "vice", "primary", "protector",
+    "qualified", "representative", "residuary", "secretary", "share", "skip", "special", "needs",
+    "successor", "survivor", "surviving", "testamentary", "testator", "transferee", "transferor",
+    "treasurer", "trust", "trustor", "unitrust", "revocable", "irrevocable", "charitable",
+    "remainder", "heritage", "contributing", "community", "institutionalized", "protected",
+    "additional", "service", "provider", "electing", "small", "business", "life", "insurance",
+    "health", "care", "proxy", "program", "user", "name", "address", "location", "portfolio",
+    # statutes, agencies, tax and benefit terms
+    "internal", "revenue", "code", "treasury", "congress", "government", "administration",
+    "social", "security", "disability", "medicaid", "medicare", "veterans", "u.s", "us",
+    "irs", "ira", "qtip", "qsst", "cpa", "sep", "keogh", "gpoa", "csra", "state", "federal",
+    "department", "agency", "commission", "bureau", "act", "law", "section", "article",
+}  # fmt: skip
+
+_DETERMINERS = {
+    "a", "an", "my", "our", "your", "his", "her", "their", "its", "each", "every", "any",
+    "such", "no", "this", "that", "these", "those", "said", "another", "other",
+}  # fmt: skip
+
+
+def _is_vocabulary(word: str, lowercase_words: set[str] = frozenset()) -> bool:
+    """Is this word (or every hyphenated part of it) ordinary or legal vocabulary?"""
+    for part in word.casefold().replace("’", "'").split("-"):
+        part = re.sub(r"'s$", "", part)
+        singular = re.sub(r"(?<=[a-z]{3})(?:ies$)", "y", part)
+        singular = re.sub(r"(?<=[a-z]{3})s$", "", singular)
+        if not part or any(
+            w in _LEGAL_VOCABULARY or w in _GENERIC_LEADING_WORDS or w in _FUNCTION_WORDS or w in lowercase_words
+            for w in (part, singular)
+        ):
+            continue
+        return False
+    return True
+
+
 # Never a name, or part of one, on their own.
 _FUNCTION_WORDS = {
     "a", "an", "the", "of", "and", "or", "for", "to", "in", "on", "at", "by", "with", "from",
@@ -500,21 +547,18 @@ def _is_generic(d: Detection, span: str, lowercase_words: set[str]) -> bool:
     never also writes in lower case. So "Ulysses S Grant" survives a trust that
     says "I grant" (because of "Ulysses"); "Marital Share" does not.
     """
-    if d.type == "address":
-        return not re.search(r"\d", span)  # a bare city or state identifies nobody
     if d.type not in ("person", "company"):
         return False
-    words = [w for w in re.findall(r"[^\W\d_][\w'’-]*", span) if w.casefold() not in _FUNCTION_WORDS]
+    words = re.findall(r"[^\W\d_][\w.'’-]*", span)
     if d.source == "propagated" and d.type == "person":
-        # A bare surname or first name derived from a full name that passed:
-        # kept even if it doubles as an ordinary word ("Grant", "Will").
-        return not words
+        # A bare surname or first name derived from a full name that passed. Kept
+        # even if the document also uses it as an ordinary word ("Grant", "Will"),
+        # but not if it is legal vocabulary ("Trustee" from "Jane Roe, Trustee").
+        return all(_is_vocabulary(w.rstrip(".")) for w in words)
+    if words and words[0].casefold() in _DETERMINERS:
+        return True  # "my Trustee", "each Trustor": names do not start this way
     return not any(
-        w[0].isupper()
-        and w.casefold() not in _DEFINED_TERMS
-        and w.casefold() not in _GENERIC_LEADING_WORDS
-        and w.casefold() not in lowercase_words
-        for w in words
+        w[0].isupper() and not _is_vocabulary(w.rstrip("."), lowercase_words) for w in words
     )
 
 
@@ -536,7 +580,7 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
         if d.source != "regex" and _is_generic(d, text[start:end], lowercase_words):
             continue  # "my Trustee", "trust", "Marital Share", "Employee"
         if d.type in ("person", "company"):
-            bare = re.sub(r"^(?:the|an?)\s+", "", text[start:end], flags=re.IGNORECASE)
+            bare = text[start:end]
             if d.type == "company" and re.search(r"\bCourt\b", bare):
                 continue  # courts are public bodies, not parties
             if d.type == "company" and re.search(r"\b(?:corporation|company|partnership)$", bare):
@@ -562,7 +606,13 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             merged[-1] = Detection(prev.start, d.end, "address", prev.source)
         else:
             merged.append(d)
-    return merged
+    # A model-found "address" with no digit after merging is a bare place name
+    # or a label ("State of Arizona", "Address"): it identifies nobody.
+    return [
+        d
+        for d in merged
+        if not (d.type == "address" and d.source != "regex" and not re.search(r"\d", text[d.start : d.end]))
+    ]
 
 
 def _short_forms(etype: str, value: str) -> list[str]:
