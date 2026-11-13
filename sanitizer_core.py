@@ -319,11 +319,27 @@ _DEFINED_TERMS = {
     "undersigned", "vendor", "witness",
 }  # fmt: skip
 
+# Never a name, or part of one, on their own.
+_FUNCTION_WORDS = {
+    "a", "an", "the", "of", "and", "or", "for", "to", "in", "on", "at", "by", "with", "from",
+    "i", "me", "my", "mine", "we", "us", "our", "ours", "you", "your", "yours", "he", "him",
+    "his", "she", "her", "hers", "they", "them", "their", "theirs", "it", "its", "this", "that",
+    "these", "those", "any", "each", "every", "all", "no", "such", "other", "another", "said",
+    "who", "whom", "whose", "which", "if", "as", "is", "are", "be", "not", "ref",
+}  # fmt: skip
+
 # First words too generic to stand for a company on their own.
 _GENERIC_LEADING_WORDS = {
     "the", "first", "american", "united", "national", "general", "new", "north", "south",
     "east", "west", "international", "global", "city", "state", "bank", "law", "saint", "st",
     "old", "great", "royal", "federal", "central", "pacific", "atlantic",
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut",
+    "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa",
+    "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan",
+    "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "hampshire",
+    "jersey", "mexico", "york", "carolina", "dakota", "ohio", "oklahoma", "oregon",
+    "pennsylvania", "rhode", "island", "tennessee", "texas", "utah", "vermont", "virginia",
+    "washington", "wisconsin", "wyoming", "columbia", "america", "states",
 }  # fmt: skip
 
 
@@ -475,8 +491,36 @@ def save_vault(vault: dict, path: str | os.PathLike) -> None:
 # --------------------------------------------------------------------------
 
 
+def _is_generic(d: Detection, span: str, lowercase_words: set[str]) -> bool:
+    """True if a model-found span is ordinary vocabulary rather than a name.
+
+    NER models tag role words and defined terms ("my Trustee", "beneficiary",
+    "the Marital Trust") as people and companies. A span is kept only if it
+    has a capitalised word that is not a known role word and that the document
+    never also writes in lower case. So "Ulysses S Grant" survives a trust that
+    says "I grant" (because of "Ulysses"); "Marital Share" does not.
+    """
+    if d.type == "address":
+        return not re.search(r"\d", span)  # a bare city or state identifies nobody
+    if d.type not in ("person", "company"):
+        return False
+    words = [w for w in re.findall(r"[^\W\d_][\w'’-]*", span) if w.casefold() not in _FUNCTION_WORDS]
+    if d.source == "propagated" and d.type == "person":
+        # A bare surname or first name derived from a full name that passed:
+        # kept even if it doubles as an ordinary word ("Grant", "Will").
+        return not words
+    return not any(
+        w[0].isupper()
+        and w.casefold() not in _DEFINED_TERMS
+        and w.casefold() not in _GENERIC_LEADING_WORDS
+        and w.casefold() not in lowercase_words
+        for w in words
+    )
+
+
 def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
     """Validate and trim spans, then drop overlaps (longest wins, regex beats NER)."""
+    lowercase_words = set(re.findall(r"(?<![\w'’-])[a-z][a-z'’-]+(?![\w'’-])", text))
     cleaned = []
     for d in detections:
         if d.type not in ENTITY_TYPES:
@@ -489,10 +533,10 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
         start += len(span) - len(span.lstrip())
         if start >= end or PLACEHOLDER_RE.search(text[start:end]):
             continue
+        if d.source != "regex" and _is_generic(d, text[start:end], lowercase_words):
+            continue  # "my Trustee", "trust", "Marital Share", "Employee"
         if d.type in ("person", "company"):
             bare = re.sub(r"^(?:the|an?)\s+", "", text[start:end], flags=re.IGNORECASE)
-            if bare.casefold() in _DEFINED_TERMS:
-                continue  # "Employee", "the Borrower"
             if d.type == "company" and re.search(r"\bCourt\b", bare):
                 continue  # courts are public bodies, not parties
             if d.type == "company" and re.search(r"\b(?:corporation|company|partnership)$", bare):
