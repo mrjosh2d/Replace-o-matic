@@ -9,7 +9,7 @@ machine, and swapped back afterwards using a local JSON vault.
 | Step | What | Status |
 |---|---|---|
 | 1 | Deterministic core: vault, regex detectors, `scan_text`, `apply_vault`, `rehydrate_text`, alias linking, pytest suite | **Done** |
-| 2 | GLiNER (ONNX) detector plugged into `scan_text`; offline model provisioning | Next |
+| 2 | GLiNER (ONNX) detector plugged into `scan_text`; offline model provisioning | **Code done; not yet run against the real model** |
 | 3 | Long-document handling and detection quality | Planned |
 | 4 | Vault hardening and a CLI | Planned |
 
@@ -65,29 +65,36 @@ uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requi
 - If an LLM rewrites a placeholder (`[person_1]`, `PERSON 1`), re-hydration will
   not recognise it.
 
-## Step 2: GLiNER detector (next)
+## Step 2: GLiNER detector (code done, real-model run pending)
 
-- `GlinerDetector` class implementing the `ner=` callable: labels `person`,
-  `company`, `address`; score threshold; maps model output to `Detection`.
-- Load from a local directory only, with `HF_HUB_OFFLINE=1` and
-  `local_files_only=True`, and fail loudly if the model is missing.
-- `scripts/fetch_model.py`: the one deliberate online action, run once on a
-  connected machine, to download an ONNX GLiNER model into `models/`.
-- Integration tests marked `@pytest.mark.model`, skipped when no model is present.
+- `GlinerDetector` in `sanitizer_core.py`: labels `person`, `company`,
+  `organization` (mapped to company), `address`; score threshold 0.4.
+- Loads from `models/gliner` (or `SANITIZER_MODEL_DIR`) with
+  `local_files_only=True` and `HF_HUB_OFFLINE=1`. Nothing is downloaded at runtime.
+- `scan_text` now uses GLiNER by default. If the model is missing it raises
+  `ModelNotFoundError` instead of quietly returning regex hits only, because a
+  silent fallback would let every name through. Pass `ner=False` for regex only.
+- Long texts are fed to the model in overlapping 200-word windows (40-word
+  overlap), since GLiNER ignores input past its limit.
+- `scripts/fetch_model.py`: the one deliberate online action. Downloads
+  `onnx-community/gliner_small-v2.1` into `models/` (gitignored). Download only.
+- `tests/test_gliner_detector.py`: windowing, offsets and label mapping against
+  a fake model, plus one real-model test (marked `model`) that also blocks
+  sockets to prove inference is offline. It skips until the model is present.
 
-Two things to settle at the start of this step:
+Still to do, once huggingface.co is reachable from the dev environment:
 
-- **Model download.** This sandbox blocks huggingface.co. Either the environment
-  allows it, or the model files are supplied another way.
-- **`gliner` pulls in PyTorch** (about 2 GB) even when inference runs on ONNX. If
-  install size matters, the alternative is to drive the ONNX file directly with
-  `onnxruntime` + `tokenizers`, at the cost of reimplementing GLiNER's span
-  decoding.
+1. Run `python scripts/fetch_model.py`, then `pytest -m model`.
+2. Confirm the model repo's file layout matches what the loader expects
+   (`onnx/model.onnx` plus config and tokenizer files), and adjust if not.
+3. Sanity-check the 0.4 threshold on a few realistic passages.
+
+The `gliner` package was chosen over driving `onnxruntime` directly. It brings
+PyTorch along (the venv is about 5.5 GB), which is accepted.
 
 ## Step 3: long documents and quality
 
-- Chunk long texts with overlap (GLiNER's window is a few hundred tokens) and
-  merge spans back to document offsets.
+- Smarter chunking: break windows at paragraph or sentence boundaries.
 - Propagation: once a name is detected anywhere, tag every other occurrence.
 - A small labelled set of realistic legal passages to measure recall and tune
   the threshold. Missed entities are the failure that matters.

@@ -18,7 +18,9 @@ Every distinct surface form gets its own placeholder, so re-hydration is exact.
 Aliases of one real-world entity share the entity number, so a reader (or an
 LLM) can still tell that ``[COMPANY_1]`` and ``[COMPANY_1_ALIAS_1]`` co-refer.
 
-This module makes no network calls. The vault holds the real values in
+This module makes no network calls: the GLiNER model is loaded from a local
+directory only (see ``scripts/fetch_model.py`` for the one-time download) and
+the Hugging Face libraries are forced into offline mode. The vault holds the real values in
 plaintext: never commit it, and never send it anywhere with the sanitized text.
 """
 
@@ -99,6 +101,114 @@ def detect_regex(text: str) -> list[Detection]:
             group = "v" if "v" in pattern.groupindex else 0
             found.append(Detection(m.start(group), m.end(group), etype, "regex"))
     return found
+
+
+# --------------------------------------------------------------------------
+# GLiNER detector (ONNX backend, local files only)
+# --------------------------------------------------------------------------
+
+DEFAULT_MODEL_DIR = os.environ.get(
+    "SANITIZER_MODEL_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "gliner"),
+)
+
+#: Label given to GLiNER -> our entity type.
+GLINER_LABELS = {
+    "person": "person",
+    "company": "company",
+    "organization": "company",
+    "address": "address",
+}
+
+
+class ModelNotFoundError(RuntimeError):
+    """The local GLiNER model is missing. Nothing is ever downloaded at runtime."""
+
+
+class GlinerDetector:
+    """NER detector backed by a local GLiNER ONNX model.
+
+    GLiNER only reads a few hundred words at a time and silently ignores the
+    rest, so the text is fed in overlapping windows and the spans are mapped
+    back to document offsets.
+    """
+
+    def __init__(
+        self,
+        model_dir: str | os.PathLike | None = None,
+        threshold: float = 0.4,
+        window_words: int = 200,
+        overlap_words: int = 40,
+        model=None,
+    ):
+        self.threshold = threshold
+        self.window_words = window_words
+        self.overlap_words = overlap_words
+        self.model = model if model is not None else self._load(model_dir or DEFAULT_MODEL_DIR)
+
+    @staticmethod
+    def _load(model_dir):
+        model_dir = os.fspath(model_dir)
+        onnx_file = next(
+            (
+                rel
+                for rel in ("onnx/model.onnx", "model.onnx")
+                if os.path.isfile(os.path.join(model_dir, rel))
+            ),
+            None,
+        )
+        if onnx_file is None:
+            raise ModelNotFoundError(
+                f"No GLiNER ONNX model in {model_dir!r}. Run scripts/fetch_model.py once "
+                "while online, or set SANITIZER_MODEL_DIR. To scan with regex patterns "
+                "only, pass ner=False."
+            )
+        # Must be set before the Hugging Face libraries are imported.
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+        from gliner import GLiNER
+
+        return GLiNER.from_pretrained(
+            model_dir,
+            local_files_only=True,
+            load_onnx_model=True,
+            load_tokenizer=True,
+            onnx_model_file=onnx_file,
+        )
+
+    def _windows(self, text: str) -> list[tuple[int, int]]:
+        words = [(m.start(), m.end()) for m in re.finditer(r"\S+", text)]
+        if not words:
+            return []
+        step = self.window_words - self.overlap_words
+        return [
+            (words[i][0], words[min(i + self.window_words, len(words)) - 1][1])
+            for i in range(0, max(len(words) - self.overlap_words, 1), step)
+        ]
+
+    def __call__(self, text: str) -> list[Detection]:
+        found = []
+        for start, end in self._windows(text):
+            entities = self.model.predict_entities(
+                text[start:end], list(GLINER_LABELS), threshold=self.threshold
+            )
+            for e in entities:
+                etype = GLINER_LABELS.get(e["label"])
+                if etype:
+                    found.append(Detection(start + e["start"], start + e["end"], etype, "ner"))
+        return found
+
+
+_default_detector: GlinerDetector | None = None
+
+
+def default_detector() -> GlinerDetector:
+    """The shared GLiNER detector, loaded on first use."""
+    global _default_detector
+    if _default_detector is None:
+        _default_detector = GlinerDetector(DEFAULT_MODEL_DIR)
+    return _default_detector
 
 
 # --------------------------------------------------------------------------
@@ -286,9 +396,14 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
 def scan_text(
     text: str,
     existing_vault: dict | None = None,
-    ner: NerDetector | None = None,
+    ner: NerDetector | bool | None = None,
 ) -> dict:
     """Detect sensitive entities and propose placeholder mappings for the new ones.
+
+    ``ner`` selects the name/company/address detector. ``None`` (default) uses
+    the local GLiNER model and raises :class:`ModelNotFoundError` if it is not
+    installed, rather than quietly missing every name. ``False`` runs the regex
+    patterns only. Any ``text -> [Detection]`` callable can be passed instead.
 
     Neither ``text`` nor ``existing_vault`` is modified. Returns::
 
@@ -318,7 +433,9 @@ def scan_text(
         next_alias[entity_id] = max(next_alias.get(entity_id, 0), int(alias or 0))
 
     detections = detect_regex(text)
-    if ner is not None:
+    if ner is None or ner is True:
+        ner = default_detector()
+    if ner:
         detections.extend(ner(text))
 
     proposed: dict[str, dict] = {}

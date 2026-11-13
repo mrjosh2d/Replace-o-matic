@@ -80,7 +80,7 @@ def test_regex_ignores_lookalikes(text):
 
 
 def test_ssn_is_not_also_a_phone_or_ein():
-    proposal = scan_text("SSN 123-45-6789")
+    proposal = scan_text("SSN 123-45-6789", ner=False)
     assert values(proposal) == {"[FINANCIAL_ID_1]": "123-45-6789"}
 
 
@@ -138,7 +138,7 @@ def test_possessive_is_trimmed_from_ner_span():
 
 
 def test_scan_warns_about_preexisting_placeholder_tokens():
-    proposal = scan_text("The template says [PERSON_7] signs here.")
+    proposal = scan_text("The template says [PERSON_7] signs here.", ner=False)
     assert proposal["proposed"] == {}
     assert "[PERSON_7]" in proposal["warnings"][0]
 
@@ -213,7 +213,7 @@ def test_different_middle_initials_are_different_people():
 
 def test_reformatted_identifiers_are_aliases():
     text = "Call (212) 555-0147 or 212-555-0147. Mail A@B.com or a@b.com."
-    proposal = scan_text(text)
+    proposal = scan_text(text, ner=False)
     assert set(proposal["proposed"]) == {
         "[PHONE_1]", "[PHONE_1_ALIAS_1]", "[EMAIL_1]", "[EMAIL_1_ALIAS_1]"
     }  # fmt: skip
