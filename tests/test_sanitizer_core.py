@@ -69,6 +69,10 @@ def values(proposal):
         ("LAW OFFICES\n#1 OLD CAPITAL SQUARE\nSPRINGFIELD, ILLINOIS 00000\n", "address", "SPRINGFIELD, ILLINOIS 00000"),
         ("offices at 4120 Harbor View Drive, Suite 300, Tacoma", "address", "4120 Harbor View Drive, Suite 300"),
         ("mail to P.O. Box 71188 today", "address", "P.O. Box 71188"),
+        ("FAX (858) 555-1212 www.AFT.com ©2022", "url", "www.AFT.com"),
+        ("See https://www.acme-law.com/team/j.smith?id=4.", "url", "https://www.acme-law.com/team/j.smith?id=4"),
+        ("visit smithlaw.com, or call", "url", "smithlaw.com"),
+        ("such as The Depository Trust Company, Euroclear", "company", "The Depository Trust Company"),
         ("Call (212) 555-0147 now", "phone", "(212) 555-0147"),
         ("Call +1 212.555.0147 now", "phone", "+1 212.555.0147"),
         ("Call 212-555-0147.", "phone", "212-555-0147"),
@@ -86,6 +90,7 @@ def test_regex_detects(text, expected_type, expected_value):
         "dated 2024-01-15",
         "invoice 1234-56-78901",
         "000-12-3456",  # invalid SSN area
+        "see Treas.Reg. and the U.S.C.A. and e.g.this or Section 2.com",
         "under the Delaware General Corporation Law",
         "the Arizona Revised Limited Liability Company Act",
         "Section 5 applies and 30 days later the road closed",
@@ -225,6 +230,31 @@ def test_entity_descriptions_are_not_companies():
     text = "Acme Works LLC, a Delaware corporation, and the Claimant agree."
     ner = fake_ner(company=["Delaware corporation", "Claimant"])
     assert values(scan_text(text, ner=ner)) == {"[COMPANY_1]": "Acme Works LLC"}
+
+
+def test_middle_name_between_two_name_pieces_is_redacted_and_linked():
+    text = "Chester A. Arthur, also known as Chester Alan Arthur, signs. Chester Alan Arthur, Jr. takes."
+    proposal = scan_text(text, ner=fake_ner(person=["Chester A. Arthur", "Chester Alan Arthur, Jr."]))
+    by_value = {e["value"]: e["entity"] for e in proposal["proposed"].values()}
+    assert by_value["Chester Alan Arthur"] == by_value["Chester A. Arthur"]
+    vault = merge_vault(None, proposal["proposed"])
+    safe = apply_vault(text, vault)
+    assert "Alan" not in safe and "Arthur" not in safe
+    assert rehydrate_text(safe, vault) == text
+
+
+def test_two_separate_people_are_not_joined_across_ordinary_words():
+    text = "John Smith and Mary Jones met. Smith told Jones. Smith, Jones agreed."
+    proposal = scan_text(text, ner=fake_ner(person=["John Smith", "Mary Jones"]))
+    assert all(" " not in v or v in ("John Smith", "Mary Jones") for v in (e["value"] for e in proposal["proposed"].values()))
+
+
+def test_url_and_email_do_not_collide():
+    text = "Write to info@acme-law.com or see www.acme-law.com."
+    proposal = scan_text(text, ner=False)
+    assert values(proposal) == {"[EMAIL_1]": "info@acme-law.com", "[URL_1]": "www.acme-law.com"}
+    vault = merge_vault(None, proposal["proposed"])
+    assert apply_vault(text, vault) == "Write to [EMAIL_1] or see [URL_1]."
 
 
 def test_shared_first_name_is_not_linked_to_either_person():

@@ -57,7 +57,7 @@ os.environ.update(_OFFLINE_ENV)
 
 VAULT_VERSION = 1
 
-ENTITY_TYPES = ("person", "company", "address", "financial_id", "email", "phone")
+ENTITY_TYPES = ("person", "company", "address", "financial_id", "email", "phone", "url")
 
 PLACEHOLDER_RE = re.compile(
     r"\[(?:" + "|".join(t.upper() for t in ENTITY_TYPES) + r")_\d+(?:_ALIAS_\d+)?\]"
@@ -148,6 +148,14 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             + r"(?!\w)(?![ \t]+(?:Law|Act|Code|Liability|Partnership|Power|Powers|to|by|in|for)\b)"
         ),
     ),
+    # Trust companies: "The Depository Trust Company", "First Bank & Trust Company"
+    (
+        "company",
+        re.compile(
+            _B + _CO_WORD + r"(?:[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,4}?[ \t]+(?:&[ \t]+)?"
+            r"(?:Trust Company|TRUST COMPANY)(?!\w)"
+        ),
+    ),
     # Law-firm lists: "Oyelaran, Schmidt & Lindqvist PC". Each listed name is one
     # word, and "Esq."/"Jr." may not be one, so a preceding person is not swallowed.
     (
@@ -179,6 +187,16 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             _B + r"(?:[A-Z][A-Za-z]+\.?[ \t]+){0,2}[A-Z][A-Za-z]+,[ \t]+"
             r"(?:[A-Z]{2}|[A-Z][A-Za-z]+(?:[ \t]+[A-Z][A-Za-z]+)?)[ \t]+"  # OH, Ohio, NEW YORK
             r"(?:\d{5}(?:-\d{4})?|[A-Z]\d[A-Z][ \t]?\d[A-Z]\d)" + _E  # US zip or Canadian code
+        ),
+    ),
+    # Web addresses: a firm's site names the firm. With a scheme or "www.", or a
+    # bare domain on a common ending. Trailing sentence punctuation is left out.
+    (
+        "url",
+        re.compile(
+            r"(?<![\w@./-])(?:(?:https?://|www\.)[\w-]+(?:\.[\w-]+)+"
+            r"|[A-Za-z][\w-]{2,}(?:\.[\w-]+)*\.(?:com|org|net|law|gov|edu|us|io|co|biz|info))"
+            r"(?:/[^\s<>\"')\]]*)?(?<![.,;:!?])(?![\w@-])"
         ),
     ),
     ("email", re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")),
@@ -467,12 +485,18 @@ def _person_relation(a: tuple[str, ...], b: tuple[str, ...]) -> str:
     # "John Q. Smith" vs "John Smith": same first and last, one has no middle name
     if a[0] == b[0] and a[-1] == b[-1] and 2 in (len(a), len(b)):
         return "strong"
+    # "Chester A. Arthur" vs "Chester Alan Arthur": middle initial matches middle name
+    if a[0] == b[0] and a[-1] == b[-1] and len(a) == len(b):
+        if all(x == y or (1 in (len(x), len(y)) and x[0] == y[0]) for x, y in zip(a[1:-1], b[1:-1])):
+            return "strong"
     return "conflict"
 
 
 def _generic_key(etype: str, value: str) -> str:
     if etype == "email":
         return value.casefold()
+    if etype == "url":
+        return re.sub(r"^(?:https?://)?(?:www\.)?", "", value.casefold()).rstrip("/")
     if etype == "phone":
         digits = re.sub(r"\D", "", value)
         return digits[1:] if len(digits) == 11 and digits[0] == "1" else digits
@@ -706,6 +730,8 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             # "See Group", "Survivor Limited": a heading that happens to end in a
             # word firms use. Unambiguous suffixes (LLC, Inc., N.A.) are never dropped.
             weak = re.search(r"[,\s]+(?:&\s+)?(?:Limited|LIMITED|Company|COMPANY|" + _CO_KIND + r")$", text[start:end])
+            if re.search(r"(?i)\btrust company$", text[start:end]):
+                weak = None  # "The Depository Trust Company": a kind of institution, not a heading
             if weak and _is_generic(
                 Detection(start, start + weak.start(), "company"), text[start : start + weak.start()], lowercase_words
             ):
@@ -749,6 +775,21 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             merged[-1] = Detection(prev.start, d.end, "address", prev.source)
         else:
             merged.append(d)
+    # "[Chester] Alan [Arthur]": two pieces of one name with a middle name or
+    # initial left between them. Join them so the middle name is redacted too.
+    joined: list[Detection] = []
+    for d in merged:
+        prev = joined[-1] if joined else None
+        if (
+            prev
+            and prev.type == d.type == "person"
+            and re.fullmatch(r"[ \t]+(?:[A-Z][\w'’-]*\.?[ \t]+){1,2}", text[prev.end : d.start])
+        ):
+            joined[-1] = Detection(prev.start, d.end, "person", "propagated")
+        else:
+            joined.append(d)
+    merged = joined
+
     # A model-found "address" with no digit after merging is a bare place name
     # or a label ("State of Arizona", "Address"): it identifies nobody.
     return [
