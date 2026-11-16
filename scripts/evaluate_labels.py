@@ -51,7 +51,7 @@ def main(argv):
             for i in chars:
                 seen[i] = 1
             if not chars:
-                outcome["not found in document"] += 1
+                outcome["no occurrence outside a longer label"] += 1
                 continue
             covered = sum(redacted[i] for i in chars)
             doc_total += len(chars)

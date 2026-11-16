@@ -13,7 +13,7 @@ machine, and swapped back afterwards using a local JSON vault.
 | 3 | Long-document handling and detection quality: labelled passages, measurement script, gap fixes | **Done** |
 | 4 | Human review, "I'm feeling lucky", encrypted vault, command-line tool, .docx/PDF input | **Done** |
 | 5 | .docx in, .docx out with formatting kept; headers, footers, footnotes, endnotes, comments | **Done** |
-| 6 | Labelled measurement on real documents | Draft labels with the owner for correction |
+| 6 | Labelled measurement on real documents; web addresses, middle names | **Done** |
 
 ## Step 1: deterministic core (done)
 
@@ -52,8 +52,8 @@ uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requi
      person fits. With John Smith and Mary Smith in play, `Smith` gets its own
      number.
    - Identifiers link when they differ only in formatting.
-4. **Email and phone get their own types** (`[EMAIL_1]`, `[PHONE_1]`) instead of
-   being folded into `financial_id`. SSN, EIN and bank numbers are `financial_id`.
+4. **Email, phone and web address get their own types** (`[EMAIL_1]`, `[PHONE_1]`,
+   `[URL_1]`) instead of being folded into `financial_id`. SSN, EIN and bank numbers are `financial_id`.
 5. **Overlapping detections:** the longest span wins; regex beats NER on a tie.
 
 ### Known limits
@@ -296,10 +296,10 @@ Limits:
   touched. Field codes and hyperlink targets are not touched, only visible text.
 - Not opened in Microsoft Word here; only LibreOffice was available.
 
-## Step 6: labelled measurement on real documents (draft labels out for review)
+## Step 6: labelled measurement on real documents (done)
 
-Draft labels for the five sample documents were produced without using the
-tool's own decisions:
+Labels for the five sample documents were drafted without using the tool's own
+decisions, then reviewed by the owner:
 
 1. Candidates per document: everything the raw model flags at threshold 0.15
    (no filters), every regex hit, every capitalised phrase and every long
@@ -308,23 +308,41 @@ tool's own decisions:
    candidate lists only.
 3. Rows that merely contain a shorter sensitive row plus ordinary words
    ("John Doe's Social Security Number") were dropped, leaving 88 labels.
+4. The owner reviewed the sheet: one text correction, and two notes (a firm's
+   tagline being only partly caught is acceptable; a firm name inside a web
+   address is hard and context-dependent).
 
 The label sheets hold text from the sample documents, so they are kept out of
-the repository. `scripts/evaluate_labels.py` scores the tool against a
-corrected sheet.
+the repository. `scripts/evaluate_labels.py` scores the tool against a sheet.
 
-Against the **uncorrected draft**: 79 of 88 labels fully caught. Not a result
-to quote until the labels are reviewed; several of the nine are labelling
-questions, not leaks. What the draft already shows:
+| Against the reviewed labels (88) | Labels fully caught | Sensitive characters redacted |
+|---|---|---|
+| Before the fixes below | 79 | 97.0% |
+| After | 82 | 97.7% |
 
-- **Web addresses are not detected** (`www.AFT.com`). Real gap.
-- **A middle name can survive**: "Chester Alan Arthur" is redacted as surname
-  and first name, leaving "Alan". Real gap, small.
-- For the reviewer to decide: a firm's tagline, vendors mentioned in passing
-  ("The Depository Trust Company"), and generic titles ("REVOCABLE FAMILY
-  WEALTH TRUST", "U.S. Bank as Trustee").
+Fixed from this measurement:
 
-Next: apply the corrected labels, record the figures, then fix the gaps.
+- **Web addresses** are now detected as their own type (`[URL_1]`), so a firm
+  name inside `www.AFT.com` goes with it.
+- **Middle names:** two pieces of a person's name with one or two capitalised
+  words between them are joined ("Chester Alan Arthur" when "Chester" and
+  "Arthur" were known), and a middle initial is matched to a middle name.
+- **Trust companies** ("The Depository Trust Company") are caught by pattern.
+
+Still not fully caught:
+
+- The firm's tagline under its name (accepted by the owner as partial).
+- "The Depository Trust Company" where a PDF line break falls inside it.
+  Names broken across PDF lines are a general limit of pattern matching.
+- "FAMILY WEALTH TRUST" on its own (the forms with "Doe" are caught) and
+  "U.S. Bank" inside the regulatory phrase "U.S. Bank as Trustee": both are
+  ordinary vocabulary to the filter.
+
+How far to trust these figures: the documents are vendor samples with invented
+parties, they contain almost no identifiers (no SSNs, account numbers or
+emails), and the labels have now been used to fix things. They show the tool
+handles this kind of estate-planning document well; they do not replace the
+90% unseen-text figure from step 3 for documents of a new kind.
 
 ## Later
 
