@@ -71,9 +71,22 @@ across the top shows where they are. Nothing is written until the last step.
 
 ### Restore and key
 
-- **Restore an analysis:** choose the file that came back (.docx or .txt),
-  choose the matter, passphrase. Shows how many placeholders were restored,
-  which altered spellings were recognised, and which placeholders were unknown.
+- **Restore an analysis:** give it what came back, choose the matter,
+  passphrase. Shows how many placeholders were restored, which altered
+  spellings were recognised, and which placeholders were unknown. Three ways
+  in (asked for by the owner), on two tabs:
+  - **From a file:** choose a .docx or .txt with Browse, or drop it anywhere
+    on the screen.
+  - **Paste text:** for an answer copied straight out of a chat window (text
+    dropped on the screen lands here too). The restored text is shown in the
+    window with *Copy*, *Save as...* (plain text) and *Paste another*.
+    Nothing is written unless the user saves, because the result holds the
+    real names. On Windows, *Copy* marks the clipboard entry so it is kept out
+    of clipboard history and cloud clipboard sync. The pasted and restored
+    text are cleared on leaving the screen and on *Lock*.
+  Service calls: `restore_text(text, vault, tolerant=True) -> (restored,
+  RestoreResult)` (writes nothing; counts the same way as `restore()`) and
+  `save_restored_text(text, path, vault_path)`, both through `Backend`.
 - **Key:** from the Done screen or the Start screen. Two tick boxes,
   *Confidential key* (ticked) and *Safe key*. The confidential key gets a
   warning before it is written.
@@ -312,6 +325,11 @@ short pages on first run; *Help > How Replace-o-matic works* reopens them.
 If an output already exists (and was not picked in the Save dialog, which
 asks itself), the window asks: *Save as new file* (`case (2).sanitized.docx`,
 from `service.successor_path`), *Replace it*, or Cancel. Keys too.
+
+**Restore takes pasted text and dropped files** (`gui/screens/restore.py`,
+`tests/test_gui_restore_paste.py`): see "Restore and key" above. Checked on
+Windows that the copied text carries `CanIncludeInClipboardHistory` and
+`CanUploadToCloudClipboard` set to 0.
 
 **Left:** packaging on macOS and the Windows items above (6), and the guide (7).
 
