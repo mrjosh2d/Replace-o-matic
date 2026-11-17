@@ -168,6 +168,58 @@ def test_restore_and_keys(case, tmp_path):
     assert summary["unreviewed"] == summary["mappings"] == len(result.vault["mappings"])
 
 
+def committed(case):
+    """The case document sanitized into a new matter: (document, matter path, vault)."""
+    doc, vault_path = case
+    scan = service.scan_document(doc, service.open_matter(vault_path, PASSPHRASE))
+    result = service.commit(scan, scan.items, [], True, vault_path, PASSPHRASE)
+    return doc, vault_path, result.vault
+
+
+def test_restore_text_writes_nothing_and_reports_like_restore(case, tmp_path):
+    _, _, vault = committed(case)
+    before = sorted(os.listdir(tmp_path))
+    restored, info = service.restore_text("[person_1] beat [COMPANY_1]; see [PERSON_99].", vault)
+    assert restored == "John A. Smith beat Acme Corporation; see [PERSON_99]."
+    assert info.output_path == "" and info.restored == 2
+    assert info.altered == ["[person_1]"] and info.unknown == ["[PERSON_99]"]
+    assert sorted(os.listdir(tmp_path)) == before  # nothing written
+
+    answer = tmp_path / "answer.txt"
+    answer.write_text("[person_1] beat [COMPANY_1]; see [PERSON_99].")
+    from_file = service.restore(str(answer), vault)
+    assert (from_file.restored, from_file.altered, from_file.unknown) == (info.restored, info.altered, info.unknown)
+
+    strict, info = service.restore_text("[person_1] beat [COMPANY_1].", vault, tolerant=False)
+    assert strict == "[person_1] beat Acme Corporation." and info.restored == 1
+
+    with pytest.raises(service.ServiceError, match="no text to restore"):
+        service.restore_text("  \n", vault)
+
+
+def test_restore_text_round_trip_is_exact(case):
+    doc, _, vault = committed(case)
+    original = open(doc, encoding="utf-8").read()
+    restored, _ = service.restore_text(sc.apply_vault(original, vault), vault)
+    assert restored == original
+
+
+def test_save_restored_text(case, tmp_path):
+    _, vault_path, _ = committed(case)
+    path = str(tmp_path / "pasted.rehydrated.txt")
+    assert service.save_restored_text("John A. Smith won.", path, vault_path) == path
+    assert open(path, encoding="utf-8").read() == "John A. Smith won."
+
+    before = open(vault_path, "rb").read()
+    with pytest.raises(service.ServiceError, match="vault file.*Nothing was written"):
+        service.save_restored_text("x", vault_path, vault_path)
+    assert open(vault_path, "rb").read() == before
+    with pytest.raises(service.ServiceError, match=r"\.docx"):
+        service.save_restored_text("x", str(tmp_path / "out.docx"))
+    with pytest.raises(service.ServiceError, match="does not exist"):
+        service.save_restored_text("x", str(tmp_path / "missing" / "out.txt"))
+
+
 def test_output_path_refuses_the_original_the_matter_and_wrong_formats(case, tmp_path):
     doc, vault_path = case
     vault = service.open_matter(vault_path, PASSPHRASE)

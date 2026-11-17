@@ -63,10 +63,10 @@ class DropArea(QFrame):
     PLAIN = "#dropArea { border: 2px dashed palette(mid); border-radius: 8px; }"
     ACTIVE = "#dropArea { border: 2px dashed palette(highlight); border-radius: 8px; background: palette(alternate-base); }"
 
-    def __init__(self, text: str):
+    def __init__(self, text: str, name: str = ""):
         super().__init__()
         self.setObjectName("dropArea")
-        self.setAccessibleName(wording.A11Y_DROP)
+        self.setAccessibleName(name or wording.A11Y_DROP)
         label = QLabel(text)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setWordWrap(True)

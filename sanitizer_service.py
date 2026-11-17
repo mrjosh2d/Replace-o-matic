@@ -369,12 +369,42 @@ def commit(
 # --------------------------------------------------------------------------
 
 
+def _altered(text: str, found: list) -> list[str]:
+    return sorted({text[start:end] for start, end, name in found if text[start:end] != name})
+
+
+def _unknown(restored: str) -> list[str]:
+    return sorted(set(sc.PLACEHOLDER_RE.findall(restored)))
+
+
+def restore_text(text: str, vault: dict, tolerant: bool = True) -> tuple[str, RestoreResult]:
+    """Put the real values back into pasted text. Nothing is written: the caller
+    shows the result and saves it only if the user asks (``save_restored_text``).
+    The result's ``output_path`` is empty."""
+    if not text.strip():
+        raise ServiceError("There is no text to restore. Paste the text that came back.")
+    found = sc.find_placeholders(text, vault, tolerant)
+    restored = sc.rehydrate_text(text, vault, tolerant)
+    return restored, RestoreResult("", len(found), _altered(text, found), _unknown(restored))
+
+
+def save_restored_text(text: str, output_path: str, vault_path: str | None = None) -> str:
+    """Write restored text as plain text. Refuses the vault file, a .docx or .pdf name,
+    and a folder that does not exist. Returns the path written."""
+    problem = check_output_path("", output_path, "rehydrated", vault_path)
+    if problem:
+        raise ServiceError(problem + " Nothing was written.")
+    with open(output_path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return output_path
+
+
 def restore(path: str, vault: dict, output_path: str | None = None, tolerant: bool = True) -> RestoreResult:
     """Put the real values back into a document that contains placeholders."""
     text = read_document(path)
     mappings = vault["mappings"]
     found = sc.find_placeholders(text, vault, tolerant)
-    altered = sorted({text[start:end] for start, end, name in found if text[start:end] != name})
+    altered = _altered(text, found)
     restored = sc.rehydrate_text(text, vault, tolerant)
     output = output_path or default_output_path(path, "rehydrated")
     problem = check_output_path(path, output, "rehydrated")
@@ -393,8 +423,7 @@ def restore(path: str, vault: dict, output_path: str | None = None, tolerant: bo
     else:
         with open(output, "w", encoding="utf-8") as fh:
             fh.write(restored)
-    unknown = sorted(set(sc.PLACEHOLDER_RE.findall(restored)))
-    return RestoreResult(output, len(found), altered, unknown)
+    return RestoreResult(output, len(found), altered, _unknown(restored))
 
 
 # --------------------------------------------------------------------------

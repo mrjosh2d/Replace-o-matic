@@ -140,6 +140,14 @@ class Backend(QObject):
     def restore(self, path: str, vault: dict, output_path=None, tolerant: bool = True) -> None:
         self.submit("restore", lambda: service.restore(path, vault, output_path, tolerant))
 
+    def restore_text(self, text: str, vault: dict, tolerant: bool = True) -> None:
+        """Result: ``(restored_text, RestoreResult)``. Nothing is written."""
+        self.submit("restore_text", lambda: service.restore_text(text, vault, tolerant))
+
+    def save_restored_text(self, text: str, output_path: str, vault_path=None) -> None:
+        """Result: the path written."""
+        self.submit("save_text", lambda: service.save_restored_text(text, output_path, vault_path))
+
     def write_keys(self, vault: dict, document_path, vault_path: str, **options) -> None:
         self.submit("keys", lambda: service.write_keys(vault, document_path, vault_path, **options))
 
