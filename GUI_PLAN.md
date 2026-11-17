@@ -294,10 +294,10 @@ Each phase ends with tests passing and a short entry in `PLAN.md`.
 | # | Work | Model | Why |
 |---|---|---|---|
 | 0 | Extract `sanitizer_service.py`; CLI becomes a thin layer; progress and cancel hooks in the detector | **Done** | See "Status" below |
-| 1 | Start and Choose screens, passphrase handling, recent-matters settings (shell, step bar and log are done) | Sonnet | Routine Qt with a clear spec |
-| 2 | Scanning screen with progress bar and Cancel (worker thread, preload and cancel are done) | Sonnet | Only the screen is left; it listens to `Backend` signals |
-| 3 | Review screen: table model, edit, add, filter, context stepping, unreviewed confirmation | Sonnet, reviewed by Opus | Largest screen but well specified; Opus checks edit/add validation against the service |
-| 4 | Done screen, Restore flow, Key flow | Sonnet | Thin screens over existing service calls |
+| 1 | Start and Choose screens, passphrase handling, recent-matters settings (shell, step bar and log are done) | **Done** | See "Status" |
+| 2 | Scanning screen with progress bar and Cancel (worker thread, preload and cancel are done) | **Done** | See "Status" |
+| 3 | Review screen: table model, edit, add, filter, context stepping, unreviewed confirmation | **Done** | See "Status" |
+| 4 | Done screen, Restore flow, Key flow | **Done** | See "Status" |
 | 5 | Wording pass, keyboard access, error messages, empty and failure states | Sonnet | Mechanical once `wording.py` exists |
 | 6 | Packaging: Windows installer and macOS app, model bundled, offline check of the packaged app | **Opus** | Hardest to get right; see below |
 | 7 | User guide (two pages with screenshots) and a first-run walkthrough | Sonnet | |
