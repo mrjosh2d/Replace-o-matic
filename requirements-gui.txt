@@ -1,0 +1,2 @@
+# The desktop window (GUI_PLAN.md). Essentials only: no QtNetwork/WebEngine add-ons.
+PySide6-Essentials>=6.7

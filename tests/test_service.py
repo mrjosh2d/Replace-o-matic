@@ -2,7 +2,6 @@
 
 import os
 import re
-import sys
 
 import pytest
 
@@ -51,7 +50,6 @@ def case(tmp_path):
 def test_service_has_no_terminal_or_gui_in_it():
     source = open(service.__file__, encoding="utf-8").read()
     assert not re.search(r"\bprint\(|\binput\(|getpass|PySide|argparse", source)
-    assert "PySide6" not in sys.modules
 
 
 def test_scan_returns_review_rows_and_changes_nothing(case):

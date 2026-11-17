@@ -197,7 +197,37 @@ neither may run on the window's thread.
 `gliner` package on both labelled sets. A clean environment from
 `requirements-dev.txt` is 323 MB with no PyTorch, and passes the whole suite.
 
-Start at phase 1.
+**The window frame and the background thread are done** (`gui/app.py`,
+`gui/workers.py`, `gui/wording.py`, `tests/test_gui_backend.py`). This covers
+phase 2's threading and the shell part of phase 1:
+
+- `Backend` (in `gui/workers.py`) is the only thing screens use for slow work:
+  `preload_model`, `open_matter`, `scan`, `commit`, `restore`, `write_keys`,
+  `cancel`, `busy`, `shutdown`. Results arrive as the signals
+  `finished(job, result)`, `failed(job, message)`, `cancelled(job)` and
+  `progress(done, total)`. `failed` messages are already fit to show.
+- A cancel covers the running scan and any scan still queued, never a later
+  one. Unexpected errors are logged by type only (no document text) and the
+  worker thread survives them.
+- `MainWindow` has the step bar, the screen stack, `go(name)`, `new_task()`,
+  `lock()` and a close handler that asks before abandoning work. `Screen` is
+  the base class: override `enter()` and the `on_finished` / `on_failed` /
+  `on_cancelled` / `on_progress` handlers. Background results are routed to
+  whichever screen is showing.
+- `python -m gui.app` opens the frame. It looks for `gui/screens/__init__.py`
+  with an `install(window)` function that adds the screens and is expected to
+  define one named `"start"`.
+- All user-facing sentences go in `gui/wording.py`.
+- Tests run headless (`QT_QPA_PLATFORM=offscreen`, set by the test module)
+  with `pytest-qt`. One `strace` test runs a real scan inside the window
+  process and fails on any outbound connection.
+
+**What is left is the screens**: `gui/screens/` with Start, Choose, Scanning,
+Review, Done, Restore and Key (phases 1, 3, 4), then wording and access
+(phase 5), packaging (6) and the guide (7). In the Review screen, build the
+table from `Scan.items`, use `service.occurrences` / `service.context` for the
+context pane, `service.validate_edit` and `service.make_item` for edits and
+additions, and pass `Item` objects straight to `backend.commit`.
 
 ## Phases
 
@@ -206,8 +236,8 @@ Each phase ends with tests passing and a short entry in `PLAN.md`.
 | # | Work | Model | Why |
 |---|---|---|---|
 | 0 | Extract `sanitizer_service.py`; CLI becomes a thin layer; progress and cancel hooks in the detector | **Done** | See "Status" below |
-| 1 | Window shell, step bar, Start and Choose screens, passphrase handling, settings and log | Sonnet | Routine Qt with a clear spec |
-| 2 | Worker thread, model preload, Scanning screen with progress and cancel | **Opus** | Threading and cancellation are where GUI bugs live |
+| 1 | Start and Choose screens, passphrase handling, recent-matters settings (shell, step bar and log are done) | Sonnet | Routine Qt with a clear spec |
+| 2 | Scanning screen with progress bar and Cancel (worker thread, preload and cancel are done) | Sonnet | Only the screen is left; it listens to `Backend` signals |
 | 3 | Review screen: table model, edit, add, filter, context stepping, unreviewed confirmation | Sonnet, reviewed by Opus | Largest screen but well specified; Opus checks edit/add validation against the service |
 | 4 | Done screen, Restore flow, Key flow | Sonnet | Thin screens over existing service calls |
 | 5 | Wording pass, keyboard access, error messages, empty and failure states | Sonnet | Mechanical once `wording.py` exists |
