@@ -424,7 +424,8 @@ before the tool is distributed to anyone outside the firm.
 of the window plan), and the model runs without PyTorch (`onnx_gliner.py`):
 a clean install is about 320 MB plus the 611 MB model, down from 5.5 GB.
 
-**Next: a desktop window in place of the terminal.** The plan is in
+**Next: a desktop window in place of the terminal.** Phases 0–2 are done
+(Start, Choose, Scanning screens). The plan is in
 `GUI_PLAN.md` (PySide6, Windows and macOS, for non-technical staff).
 
 Other candidates, not yet prioritised:

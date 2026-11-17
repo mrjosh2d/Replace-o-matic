@@ -32,3 +32,57 @@ CONFIDENTIAL_KEY_WARNING = (
     "This key shows the real names next to their stand-ins. Keep it on this computer "
     "and never send it with the sanitized document."
 )
+
+# ---- Start
+START_TITLE = "What would you like to do?"
+BTN_SANITIZE = "Sanitize a document"
+BTN_RESTORE = "Restore an analysis"
+LINK_KEY = "Open a key"
+RECENT_TITLE = "Recent matters"
+RECENT_EMPTY = "No recent matters yet."
+NOT_AVAILABLE_YET = "This part is not available yet."
+
+# ---- Choose
+CHOOSE_TITLE = "Choose a document and a matter"
+DROP_HERE = "Drop a document here (.docx, .pdf or .txt)"
+BROWSE = "Browse…"
+BROWSE_DOCUMENT_TITLE = "Choose a document"
+DOCUMENT_FILTER = "Documents (*.docx *.pdf *.txt)"
+MATTER_EXISTING = "Use an existing matter"
+MATTER_NEW = "Start a new matter"
+MATTER_NONE_CHOSEN = "No matter file chosen"
+MATTER_OPEN_TITLE = "Choose a matter file"
+MATTER_SAVE_TITLE = "Save the new matter as"
+MATTER_FILTER = "Matter files (*.vault);;All files (*)"
+PASSPHRASE = "Passphrase"
+PASSPHRASE_AGAIN = "Passphrase again"
+CONTINUE = "Continue"
+BACK = "Back"
+STRENGTH_WEAK = "Weak: use at least 12 characters, or several words."
+STRENGTH_FAIR = "Fair: a longer passphrase is safer."
+STRENGTH_GOOD = "Good."
+ERR_NO_DOCUMENT = "Choose a document first."
+ERR_BAD_TYPE = "Only .docx, .pdf and .txt documents can be used. Choose a different file."
+ERR_NOT_FOUND = "That file could not be found. Choose it again."
+ERR_NO_PDF = "PDF support is not installed in this copy of Replace-o-matic. Use a .docx or .txt document."
+ERR_NO_MATTER = "Choose a matter file, or start a new matter."
+ERR_MATTER_MISSING = "That matter file could not be found. Choose it again."
+ERR_MATTER_EXISTS = (
+    "A file with that name already exists. Choose another name, or use it as an existing matter."
+)
+ERR_NO_PASSPHRASE = "Enter the passphrase."
+ERR_MISMATCH = "The two passphrases are different. Type them again."
+OPENING_MATTER = "Opening the matter…"
+
+# ---- Scanning
+SCAN_COUNT = "Part {done} of {total}"
+CANCEL = "Cancel"
+STOPPING = "Stopping…"
+LOADING_MODEL_NOTE = "Loading the language model (about 10 seconds the first time)…"
+SCAN_DONE_NO_REVIEW = "Scan finished: {count} items found. The review step is not available yet."
+CHOOSE_ANOTHER = "Choose another document"
+
+
+def plain(message: str) -> str:
+    """Service and library messages in staff wording."""
+    return message.replace("vault file", "matter file").replace("vault", "matter file")

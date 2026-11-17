@@ -247,3 +247,23 @@ def test_window_scan_opens_no_network_connection_at_os_level(tmp_path):
     assert result.returncode == 0, result.stderr[-2000:]
     outbound = [line for line in log.read_text().splitlines() if "AF_INET" in line]
     assert outbound == [], outbound[:5]
+
+
+def test_queued_signals_keep_bool_refcounts():
+    """PySide6 6.12.0 drops a reference to True per queued signal; on Python 3.11
+    that aborts the app after a few thousand signals (a long scan or two)."""
+    import sys
+
+    from PySide6.QtCore import QCoreApplication, QObject, Qt, Signal
+
+    class Emitter(QObject):
+        ping = Signal(int)
+
+    app = QCoreApplication.instance() or QCoreApplication([])
+    emitter = Emitter()
+    emitter.ping.connect(lambda value: None, Qt.ConnectionType.QueuedConnection)
+    before = sys.getrefcount(True)
+    for value in range(200):
+        emitter.ping.emit(value)
+    app.processEvents()
+    assert sys.getrefcount(True) - before > -50, "this PySide6 leaks bool references: see requirements-gui.txt"

@@ -76,6 +76,9 @@ class Screen(QWidget):
     def on_cancelled(self, job: str) -> None: ...
     def on_progress(self, done: int, total: int) -> None: ...
 
+    def forget(self) -> None:
+        """Clear anything typed or shown that came from the passphrase or a document."""
+
 
 class MainWindow(QMainWindow):
     def __init__(self, backend: Backend | None = None):
@@ -145,6 +148,8 @@ class MainWindow(QMainWindow):
         """Forget the passphrase and everything read with it."""
         self.backend.cancel()
         self.session = Session()
+        for screen in self.screens.values():
+            screen.forget()
         if "start" in self.screens:
             self.go("start")
 

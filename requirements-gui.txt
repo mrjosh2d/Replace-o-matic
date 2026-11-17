@@ -1,2 +1,5 @@
 # The desktop window (GUI_PLAN.md). Essentials only: no QtNetwork/WebEngine add-ons.
-PySide6-Essentials>=6.7
+# Not 6.12.0: on Python 3.11 every queued signal drops a reference to True, and the
+# app aborts (bool_dealloc) after a few thousand signals. tests/test_gui_backend.py
+# checks for it; re-run before lifting the cap.
+PySide6-Essentials>=6.7,<6.12
