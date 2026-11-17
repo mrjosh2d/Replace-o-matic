@@ -256,6 +256,10 @@ GLINER_LABELS = {
 }
 
 
+class ScanCancelled(Exception):
+    """A scan was stopped part-way at the caller's request. Nothing was changed."""
+
+
 class ModelNotFoundError(RuntimeError):
     """The local GLiNER model is missing. Nothing is ever downloaded at runtime."""
 
@@ -345,9 +349,16 @@ class GlinerDetector:
             i = j - self.overlap_words
         return windows
 
-    def __call__(self, text: str) -> list[Detection]:
+    def __call__(self, text: str, progress=None, cancelled=None) -> list[Detection]:
+        """``progress(done, total)`` is called after each window; ``cancelled()``
+        is checked before each one and, if true, :class:`ScanCancelled` is raised."""
         found = []
-        for start, end in self._windows(text):
+        windows = self._windows(text)
+        for n, (start, end) in enumerate(windows):
+            if cancelled is not None and cancelled():
+                raise ScanCancelled()
+            if progress is not None:
+                progress(n, len(windows))
             entities = self.model.predict_entities(
                 text[start:end], list(GLINER_LABELS), threshold=self.threshold
             )
@@ -355,6 +366,8 @@ class GlinerDetector:
                 etype = GLINER_LABELS.get(e["label"])
                 if etype:
                     found.append(Detection(start + e["start"], start + e["end"], etype, "ner"))
+        if progress is not None:
+            progress(len(windows), len(windows))
         return found
 
 
@@ -964,8 +977,13 @@ def scan_text(
     text: str,
     existing_vault: dict | None = None,
     ner: NerDetector | bool | None = None,
+    progress: Callable[[int, int], None] | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> dict:
     """Detect sensitive entities and propose placeholder mappings for the new ones.
+
+    ``progress(done, total)`` and ``cancelled()`` are passed to the GLiNER
+    detector, which is the slow part: see :meth:`GlinerDetector.__call__`.
 
     ``ner`` selects the name/company/address detector. ``None`` (default) uses
     the local GLiNER model and raises :class:`ModelNotFoundError` if it is not
@@ -987,7 +1005,9 @@ def scan_text(
     detections = detect_regex(text)
     if ner is None or ner is True:
         ner = default_detector()
-    if ner:
+    if isinstance(ner, GlinerDetector):
+        detections.extend(ner(text, progress=progress, cancelled=cancelled))
+    elif ner:
         detections.extend(ner(text))
 
     spans = _clean_spans(text, detections)
