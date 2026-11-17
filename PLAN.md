@@ -417,5 +417,20 @@ bundled would bring the AGPL's terms with it.
 
 ## Later
 
-- Redact scanned PDFs (OCR).
-- Keep the original typeface for placeholders in PDFs.
+Decided by the owner: PyMuPDF's AGPL licence is acceptable for now. Revisit it
+before the tool is distributed to anyone outside the firm.
+
+Candidates for future work, not yet prioritised:
+
+- **Setup for a normal computer:** a one-step installer and a plain-language
+  user guide. Today the tool needs Python, a 5 GB install and a terminal.
+- **A simple window** in place of the terminal: pick a file, review the items,
+  save. The review logic is already separate from the prompt.
+- **Batch mode:** sanitize a whole folder against one matter's vault.
+- **Scanned PDFs:** OCR, then redact.
+- **Measurement on other document types:** litigation, contracts,
+  correspondence. Everything measured on real documents so far is estate
+  planning and one LLC agreement.
+- **Keychain** in place of the typed passphrase (the seam exists).
+- **Original typeface** for placeholders in PDFs.
+- **A smaller install:** drive the ONNX model without PyTorch.
