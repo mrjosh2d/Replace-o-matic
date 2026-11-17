@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import re
 import stat
 
@@ -613,7 +614,8 @@ def test_vault_save_load_round_trip(tmp_path):
     path = tmp_path / "vault.json"
     save_vault(vault, path)
     assert load_vault(path) == vault
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    if os.name != "nt":  # Windows has no POSIX modes: the user profile's ACL governs access
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert json.loads(path.read_text(encoding="utf-8"))["version"] == 1
 
 

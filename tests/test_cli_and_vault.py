@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import zipfile
 
@@ -374,7 +375,8 @@ def test_key_writes_confidential_and_safe_tables(tmp_path):
     assert table["[PERSON_1_ALIAS_1]"][2:5] == ["Smith", "[PERSON_1]", "1"]
     assert table["[COMPANY_1_ALIAS_1]"][2:4] == ["Acme", "[COMPANY_1]"]
     assert [r[0] for r in rows[2:4]] == ["[PERSON_1]", "[PERSON_1_ALIAS_1]"]  # aliases sit under their entity
-    assert stat.S_IMODE(confidential.stat().st_mode) == 0o600
+    if os.name != "nt":  # Windows has no POSIX modes: the user profile's ACL governs access
+        assert stat.S_IMODE(confidential.stat().st_mode) == 0o600
 
     safe_text = safe.read_text(encoding="utf-8-sig")
     for real in ("Smith", "Acme", "123-45-6789", "Arbitration"):

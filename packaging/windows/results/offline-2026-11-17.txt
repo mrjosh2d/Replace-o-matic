@@ -1,0 +1,22 @@
+Offline check, 2026-11-17T13:22:20, Windows 10.0.26200.0
+network adapters up: 1 Tailscale
+WARNING: connected networks: Tailscale; the network is not off
+install (Replace-o-matic-Setup-0.1.0.exe): exit 0
+self-test: self-test: ok; found 3 items; pdf support: True; unwanted modules: [] (exit 0)
+== start the app
+== sanitize the .docx with a new matter
+   ok: invented-letter.sanitized.docx
+== make a key
+   ok: 2 key files
+== restore the sanitized .docx
+   ok: invented-letter.sanitized.rehydrated.docx
+== sanitize the .pdf in the same matter
+   ok: invented-memo.sanitized.pdf
+== passed
+window run: exit 0
+
+Note (added afterwards): Wi-Fi, Ethernet and the other physical adapters were Disconnected
+(1:22:18 PM). The Tailscale VPN adapter stays Up with no physical link under it, so
+the warning above is a false alarm; sandbox_check.ps1 now reports it separately.
+The sanitized .docx and .pdf held none of the invented names; the restored .docx
+matched the original exactly.

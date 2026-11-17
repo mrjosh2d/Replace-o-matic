@@ -245,9 +245,27 @@ phase 2's threading and the shell part of phase 1:
 - `Replace-o-matic --self-test` loads the bundled model, scans a sentence and
   exits 0. Run under `strace`, the packaged app made no outbound connection,
   and it contains no PyTorch, transformers, gliner, QtNetwork or WebEngine.
-- Still to do for phase 6: build with the same spec on Windows and macOS
-  (PyInstaller does not cross-compile), wrap in an installer and a `.dmg`,
-  sign and notarise, and repeat the offline check on each with the network off.
+- Still to do for phase 6: macOS (build, `.dmg`, sign, notarise), signing on
+  Windows, and a clean-machine run on Windows.
+
+**Windows is built and checked** (`packaging/windows/`; steps and results in
+its `README.md`):
+
+- Same spec, plus a fix: on Windows the PySide6 hook pulled in the TUIO touch
+  plugin and `Qt6Network.dll`; both are dropped. `scripts/check_dist.py` fails
+  the build if torch, transformers, gliner or any Qt network or web library is
+  bundled. App folder 920 MB, installer 632 MB.
+- Inno Setup installer: per user, no administrator rights, Start-menu entry,
+  uninstaller, model bundled. Unsigned until the firm has a certificate, so
+  SmartScreen warns.
+- `gui_smoke.ps1` drives the installed app through its window (new matter,
+  .docx, keys, restore, .pdf): passed. Under Process Monitor with the network
+  on: 38,027 events from the app, none TCP or UDP. With Wi-Fi off, install,
+  self-test and the window run all passed. A clean-machine run (Sandbox via
+  `offline-check.wsb`, or a VM) is still to do: the build PC is Windows Home.
+- The window run found a bug: started as a program, `gui/app.py` was loaded
+  twice, so no background result reached a screen and the app stopped at
+  "Working…". Fixed, with a test.
 
 **The screens are built and work end to end** (`gui/screens/`, `gui/settings.py`,
 `tests/test_gui_screens.py`). Function first: they have had no visual polish.
@@ -295,7 +313,7 @@ If an output already exists (and was not picked in the Save dialog, which
 asks itself), the window asks: *Save as new file* (`case (2).sanitized.docx`,
 from `service.successor_path`), *Replace it*, or Cancel. Keys too.
 
-**Left:** packaging on Windows and macOS (6) and the guide (7).
+**Left:** packaging on macOS and the Windows items above (6), and the guide (7).
 
 ## Phases
 

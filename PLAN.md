@@ -434,8 +434,9 @@ lists what is left.
 
 Other candidates, not yet prioritised:
 
-- **Setup for a normal computer:** a one-step installer and a plain-language
-  user guide. Today the tool needs Python and a terminal.
+- **Setup for a normal computer:** a Windows installer now exists (per user, no
+  administrator rights, model bundled; `packaging/windows/README.md`). Still to
+  do: signing, macOS, and a plain-language user guide.
 - **A simple window** in place of the terminal: pick a file, review the items,
   save. The review logic is already separate from the prompt.
 - **Batch mode:** sanitize a whole folder against one matter's vault.

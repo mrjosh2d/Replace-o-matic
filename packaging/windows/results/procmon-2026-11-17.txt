@@ -1,0 +1,13 @@
+Process Monitor network check, 2026-11-17
+Process Monitor 4.13; filter replace_o_matic_process.pmc (Process Name is Replace-o-matic.exe)
+Windows 10.0.26200.0 (Windows 11 Home); network on
+App: installed build of this branch, %LOCALAPPDATA%\Programs\Replace-o-matic
+Run: gui_smoke.ps1 (new matter, sanitize .docx, keys, restore, sanitize .pdf): passed
+
+events from replace-o-matic.exe: 38027
+  IPC: 14406
+  Registry: 12509
+  File_System: 10872
+  Process: 216
+  Profiling: 24
+network (TCP/UDP) events: 0

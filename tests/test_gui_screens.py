@@ -3,6 +3,7 @@
 Set ``SCREENSHOT_DIR`` to save a PNG of each screen as the tests pass through it.
 """
 
+import json
 import os
 import re
 import threading
@@ -461,4 +462,43 @@ def test_settings_file_holds_paths_only(qtbot, window, case):
     for name in os.listdir(home):
         content = open(os.path.join(home, name), encoding="utf-8").read()
         assert PASSPHRASE not in content and "Smith" not in content and "Acme" not in content
-    assert matter in open(os.path.join(home, "settings.json"), encoding="utf-8").read()
+    with open(os.path.join(home, "settings.json"), encoding="utf-8") as f:
+        assert matter in json.load(f)["recent_matters"]  # parsed: JSON escapes Windows backslashes
+
+
+RUN_AS_PROGRAM = """
+import runpy
+import gui.app
+from gui.screens import install
+
+def check():
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    window = gui.app.MainWindow()
+    install(window)
+    window.go("start")
+    print("screen found" if window.current() is not None else "no screen", flush=True)
+    return 0
+
+gui.app.main = check
+runpy.run_module("gui.app", run_name="__main__")
+"""
+
+
+def test_running_the_app_as_a_program_reaches_the_screens():
+    # As a program, gui/app.py is __main__ while the screens import gui.app. Unless the
+    # entry point hands over to gui.app, MainWindow.current() matches no screen and every
+    # background result is dropped (the app stalls on "Working..." after Continue).
+    import subprocess
+    import sys
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", PYTHONPATH=root)
+    try:
+        done = subprocess.run([sys.executable, "-c", RUN_AS_PROGRAM], cwd=root, env=env,
+                              capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        pytest.fail("gui.app run as __main__ opened its own window instead of handing over to gui.app")
+    # Only the printed line is checked: the child never closes its window, and PySide may
+    # crash while tearing that down at exit on Windows.
+    assert "screen found" in done.stdout, done.stdout + done.stderr

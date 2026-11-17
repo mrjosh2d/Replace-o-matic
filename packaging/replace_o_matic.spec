@@ -32,6 +32,15 @@ analysis = Analysis(
         "PySide6.QtPdf", "PySide6.QtMultimedia", "PySide6.QtSql", "PySide6.QtBluetooth",
     ],
 )
+# On Windows the PySide6 hook also collects plugins/generic/qtuiotouchplugin.dll
+# (TUIO touch input, which listens on UDP) and with it Qt6Network.dll. Neither
+# is needed; drop both so the bundle has no Qt networking library at all.
+# scripts/check_dist.py fails the build if any of them come back.
+analysis.binaries = [
+    entry for entry in analysis.binaries
+    if not any(bad in entry[0].replace("\\", "/").lower()
+               for bad in ("qt6network", "plugins/generic/"))
+]
 pyz = PYZ(analysis.pure)
 exe = EXE(
     pyz,
