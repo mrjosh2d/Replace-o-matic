@@ -8,16 +8,18 @@ import os
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QVBoxLayout,
     QWidget,
 )
 
 from gui import settings, wording
-from gui.app import Screen
+from gui.app import MARGIN, SPACING, Screen
 
 SHORT_PASSPHRASE = 16
 
@@ -29,6 +31,52 @@ def heading(text: str) -> QLabel:
     font.setBold(True)
     label.setFont(font)
     return label
+
+
+def page(screen: QWidget) -> QVBoxLayout:
+    """The outer layout every screen uses, so margins and spacing match."""
+    layout = QVBoxLayout(screen)
+    layout.setContentsMargins(MARGIN, MARGIN, MARGIN, MARGIN)
+    layout.setSpacing(SPACING)
+    return layout
+
+
+def tab_chain(*widgets: QWidget) -> None:
+    """Tab visits the widgets in this order (creation order is not always reading order)."""
+    for first, second in zip(widgets, widgets[1:]):
+        QWidget.setTabOrder(first, second)
+
+
+def big(button: QPushButton, height: int = 40) -> QPushButton:
+    """A larger button; Enter presses it while it has the focus."""
+    button.setMinimumHeight(height)
+    button.setAutoDefault(True)
+    return button
+
+
+class DropArea(QFrame):
+    """A dashed box that says where to drop a file. The screen handles the drop
+    itself and calls ``set_active`` while a file is being dragged over."""
+
+    PLAIN = "#dropArea { border: 2px dashed palette(mid); border-radius: 8px; }"
+    ACTIVE = "#dropArea { border: 2px dashed palette(highlight); border-radius: 8px; background: palette(alternate-base); }"
+
+    def __init__(self, text: str):
+        super().__init__()
+        self.setObjectName("dropArea")
+        self.setAccessibleName(wording.A11Y_DROP)
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setWordWrap(True)
+        row = QVBoxLayout(self)
+        row.setContentsMargins(16, 24, 16, 24)
+        row.addWidget(label)
+        self.setMinimumHeight(90)
+        self.set_active(False)
+
+    def set_active(self, active: bool) -> None:
+        self.active = active
+        self.setStyleSheet(self.ACTIVE if active else self.PLAIN)
 
 
 def message_label() -> QLabel:
@@ -43,12 +91,16 @@ class FilePicker(QWidget):
     """A path box with a Browse button."""
 
     changed = Signal(str)
+    submitted = Signal()  # Enter pressed in the path box
 
-    def __init__(self, file_filter: str, save: bool = False):
+    def __init__(self, file_filter: str, save: bool = False, name: str = "", browse_name: str = ""):
         super().__init__()
         self.file_filter, self.save = file_filter, save
         self.edit = QLineEdit()
         self.button = QPushButton(wording.BROWSE)
+        self.edit.setAccessibleName(name or wording.A11Y_DOCUMENT)
+        self.button.setAccessibleName(browse_name or wording.A11Y_BROWSE_DOCUMENT)
+        self.edit.returnPressed.connect(self.submitted)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(self.edit, 1)
@@ -74,13 +126,18 @@ class FilePicker(QWidget):
 
 class MatterForm(QWidget):
     """Matter file and passphrase. A matter file that does not exist yet is a
-    new matter: the passphrase is asked twice and the no-recovery warning shown."""
+    new matter: the passphrase is asked twice and the no-recovery warning shown.
+    ``submitted`` fires when Enter is pressed in any of its boxes."""
+
+    submitted = Signal()
 
     def __init__(self, must_exist: bool = False):
         super().__init__()
         self.must_exist = must_exist
         self._open_path = ""  # the matter already open in this session, if any
-        self.picker = FilePicker(wording.MATTER_FILES)
+        self.picker = FilePicker(
+            wording.MATTER_FILES, name=wording.A11Y_MATTER, browse_name=wording.A11Y_BROWSE_MATTER
+        )
         self.new_button = QPushButton(wording.MATTER_NEW)
         self.new_button.setVisible(not must_exist)
         self.picker.layout().addWidget(self.new_button)
@@ -88,6 +145,10 @@ class MatterForm(QWidget):
         self.again = QLineEdit()
         for box in (self.passphrase, self.again):
             box.setEchoMode(QLineEdit.EchoMode.Password)
+            box.returnPressed.connect(self.submitted)
+        self.picker.submitted.connect(self.submitted)
+        self.passphrase.setAccessibleName(wording.PASSPHRASE)
+        self.again.setAccessibleName(wording.PASSPHRASE_AGAIN)
         self.again_label = QLabel(wording.PASSPHRASE_AGAIN)
         self.passphrase_label = QLabel(wording.PASSPHRASE)
         self.hint = QLabel("")
@@ -113,6 +174,9 @@ class MatterForm(QWidget):
         self._refresh()
 
     # ---- state
+
+    def tab_widgets(self) -> list[QWidget]:
+        return [self.picker.edit, self.picker.button, self.new_button, self.passphrase, self.again]
 
     def path(self) -> str:
         return self.picker.path()
@@ -178,9 +242,10 @@ class MatterScreen(Screen):
         self._opening = None
         self.message = message_label()
         self.go_button = QPushButton(wording.CONTINUE)
-        self.go_button.setDefault(True)
+        big(self.go_button).setDefault(True)  # Enter in any box also presses it
         self.go_button.clicked.connect(self.start)
-        self.back_button = QPushButton(wording.BACK)
+        self.form.submitted.connect(self.start)
+        self.back_button = big(QPushButton(wording.BACK))
         self.back_button.clicked.connect(lambda: self.window_.go("start"))
 
     def buttons(self) -> QHBoxLayout:
@@ -202,6 +267,7 @@ class MatterScreen(Screen):
 
     def set_busy(self, busy: bool) -> None:
         self.go_button.setEnabled(not busy)
+        self.form.setEnabled(not busy)
         if busy:
             self.message.setText(wording.WORKING)
 
@@ -244,3 +310,6 @@ class MatterScreen(Screen):
         self._opening = None
         self.set_busy(False)
         self.message.setText(message)
+        if self.form.passphrase.isVisible():
+            self.form.passphrase.setFocus()
+            self.form.passphrase.selectAll()

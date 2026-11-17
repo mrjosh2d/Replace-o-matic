@@ -24,6 +24,7 @@ import logging
 import sanitizer_core as sc  # first project import: it sets the offline switches
 
 import sanitizer_service as service
+from gui import wording
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 log = logging.getLogger("replace_o_matic")
@@ -52,8 +53,9 @@ class _Engine(QObject):
             result = job()
         except sc.ScanCancelled:
             self.cancelled.emit(name)
-        except service.ServiceError as error:
-            self.failed.emit(name, str(error))  # written for the user already
+        except (service.ServiceError, sc.VaultError) as error:
+            # The one place service and core wording is put into staff words.
+            self.failed.emit(name, wording.for_staff(str(error)))
         except sc.ModelNotFoundError:
             log.error("model not found")
             self.failed.emit(name, NO_MODEL)

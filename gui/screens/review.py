@@ -9,7 +9,8 @@ from __future__ import annotations
 import sanitizer_core as sc  # first project import: it sets the offline switches
 
 import sanitizer_service as service
-from PySide6.QtCore import QSortFilterProxyModel, Qt
+from PySide6.QtCore import QSortFilterProxyModel, Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -26,10 +27,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from gui import wording
+from gui import settings, wording
 from gui.app import Screen
-from gui.review_model import TEXT, TICK, TYPE, TYPE_LABELS, ReviewTableModel
-from gui.screens.common import message_label
+from gui.review_model import FOUND_BY, SAME_AS, TEXT, TICK, TIMES, TYPE, TYPE_LABELS, ReviewTableModel
+from gui.screens.common import big, message_label, page, tab_chain
 
 
 def type_combo(parent=None) -> QComboBox:
@@ -50,6 +51,19 @@ class TypeDelegate(QStyledItemDelegate):
 
     def setModelData(self, editor, model, index) -> None:  # noqa: N802
         model.setData(index, editor.currentData(), Qt.ItemDataRole.EditRole)
+
+
+class ReviewTable(QTableView):
+    """The items table. Space ticks or unticks the selected rows (``toggle_requested``)."""
+
+    toggle_requested = Signal()
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802 (Qt name)
+        if event.key() == Qt.Key.Key_Space and not event.modifiers():
+            self.toggle_requested.emit()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class ReviewFilter(QSortFilterProxyModel):
@@ -119,7 +133,7 @@ class AddDialog(QDialog):
         if problem is None:
             found = service.occurrences(self.state.scan.text, text.strip())
             first = service.context(self.state.scan.text, *found[0])
-            self.preview.setText(wording.ADD_FOUND.format(count=len(found), context=first))
+            self.preview.setText(wording.ADD_FOUND.format(times=wording.times(len(found)), context=first))
         else:
             self.preview.setText(problem)
 
@@ -139,12 +153,15 @@ class ReviewScreen(Screen):
         self.accept_all_button = QPushButton(wording.ACCEPT_ALL)
         self.decline_button = QPushButton(wording.DECLINE_SELECTED)
         self.filter = QComboBox()
+        self.filter.setAccessibleName(wording.A11Y_FILTER)
         self.filter.addItem(wording.ALL_TYPES, "")
         for etype in sc.ENTITY_TYPES:
             self.filter.addItem(TYPE_LABELS[etype], etype)
         self.search = QLineEdit()
         self.search.setPlaceholderText(wording.SEARCH)
         self.search.setClearButtonEnabled(True)
+        self.search.setAccessibleName(wording.A11Y_SEARCH)
+        self.search.setToolTip(wording.SEARCH_TIP)
         top = QHBoxLayout()
         top.addWidget(self.count, 1)
         top.addWidget(self.accept_all_button)
@@ -153,7 +170,10 @@ class ReviewScreen(Screen):
         top.addWidget(self.filter)
         top.addWidget(self.search)
 
-        self.table = QTableView()
+        self.table = ReviewTable()
+        self.table.setAccessibleName(wording.A11Y_TABLE)
+        self.table.setToolTip(wording.TABLE_TIP)
+        self.table.setAlternatingRowColors(True)
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -164,6 +184,10 @@ class ReviewScreen(Screen):
         self.where = QLabel(wording.WHERE_NONE)
         self.previous_button = QPushButton(wording.PREVIOUS)
         self.next_button = QPushButton(wording.NEXT)
+        self.previous_button.setAccessibleName(wording.A11Y_PREVIOUS)
+        self.next_button.setAccessibleName(wording.A11Y_NEXT)
+        self.previous_button.setToolTip(wording.PREVIOUS_TIP)
+        self.next_button.setToolTip(wording.NEXT_TIP)
         for button in (self.previous_button, self.next_button):
             button.setFixedWidth(40)
         where_row = QHBoxLayout()
@@ -172,12 +196,15 @@ class ReviewScreen(Screen):
         where_row.addWidget(self.next_button)
         self.context = message_label()
         self.context.setMinimumHeight(48)
+        self.context.setAccessibleName(wording.A11Y_CONTEXT)
+        self.empty = message_label()  # shown when the scan found nothing
+        self.empty.setText(wording.REVIEW_EMPTY)
         self.notes = message_label()  # scan warnings and what is already known
         self.message = message_label()
 
         self.add_button = QPushButton(wording.ADD_MISSED)
-        self.back_button = QPushButton(wording.BACK)
-        self.sanitize_button = QPushButton("")
+        self.back_button = big(QPushButton(wording.BACK))
+        self.sanitize_button = big(QPushButton(""))
         self.sanitize_button.setDefault(True)
         self.sanitize_button.setMinimumWidth(150)
         bottom = QHBoxLayout()
@@ -186,8 +213,9 @@ class ReviewScreen(Screen):
         bottom.addWidget(self.back_button)
         bottom.addWidget(self.sanitize_button)
 
-        layout = QVBoxLayout(self)
+        layout = page(self)
         layout.addLayout(top)
+        layout.addWidget(self.empty)
         layout.addWidget(self.table, 1)
         layout.addLayout(where_row)
         layout.addWidget(self.context)
@@ -195,6 +223,13 @@ class ReviewScreen(Screen):
         layout.addWidget(self.message)
         layout.addLayout(bottom)
 
+        tab_chain(self.accept_all_button, self.decline_button, self.filter, self.search, self.table,
+                  self.previous_button, self.next_button, self.add_button, self.back_button,
+                  self.sanitize_button)  # fmt: skip
+        QShortcut(QKeySequence("Ctrl+F"), self, activated=self.focus_search)
+        QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self.step_context(-1))
+        QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self.step_context(1))
+        self.table.toggle_requested.connect(self.toggle_selected)
         self.table.selectionModel().currentRowChanged.connect(self._current_changed)
         self.accept_all_button.clicked.connect(self.accept_all)
         self.decline_button.clicked.connect(self.decline_selected)
@@ -209,6 +244,7 @@ class ReviewScreen(Screen):
     # ---- set-up
 
     def enter(self) -> None:
+        self.accept_all_button.setVisible(settings.allow_accept_all())  # a firm may switch it off
         scan = self.session.scan
         if self.model is None or self.model.state.scan is not scan:
             self.model = ReviewTableModel(service.ReviewState(scan), self)
@@ -217,8 +253,13 @@ class ReviewScreen(Screen):
             self.model.dataChanged.connect(self._row_changed)
             self.proxy.setSourceModel(self.model)
             self.proxy.sort(-1)
+            header = self.table.horizontalHeader()
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
             self.table.resizeColumnsToContents()
-            self.table.horizontalHeader().setSectionResizeMode(TEXT, QHeaderView.ResizeMode.Stretch)
+            for column, width in ((TYPE, 110), (TIMES, 70), (FOUND_BY, 110), (SAME_AS, 220)):
+                self.table.setColumnWidth(column, max(self.table.columnWidth(column), width))
+            header.setSectionResizeMode(TEXT, QHeaderView.ResizeMode.Stretch)  # Text takes the spare width
+            header.setStretchLastSection(False)
             self.filter.setCurrentIndex(0)
             self.search.clear()
             notes = list(scan.warnings)
@@ -244,7 +285,9 @@ class ReviewScreen(Screen):
             widget.setEnabled(not busy)
 
     def _show_counts(self, accepted: int, total: int) -> None:
-        self.count.setText(wording.REVIEW_COUNT.format(total=total, accepted=accepted))
+        self.count.setText(wording.REVIEW_COUNT.format(total=wording.plural(total, "item"), accepted=accepted))
+        self.empty.setVisible(total == 0)
+        self.table.setVisible(total > 0)
         self.sanitize_button.setText(wording.SANITIZE_N.format(count=accepted))
 
     # ---- context pane
@@ -292,6 +335,17 @@ class ReviewScreen(Screen):
     def accept_all(self) -> None:
         self.model.accept_all()
 
+    def focus_search(self) -> None:
+        self.search.setFocus()
+        self.search.selectAll()
+
+    def toggle_selected(self) -> None:
+        """Space: tick the selected rows, or untick them if they are all ticked."""
+        rows = self.selected_rows()
+        if rows:
+            rows_state = self.model.state.rows
+            self.model.set_selected(rows, not all(rows_state[r].accepted for r in rows))
+
     def decline_selected(self) -> None:
         self.model.set_selected(self.selected_rows(), False)
 
@@ -302,7 +356,7 @@ class ReviewScreen(Screen):
 
     def sanitize(self) -> None:
         accepted, declined, reviewed = self.model.state.result()
-        if not reviewed:
+        if not reviewed and self.model.state.rows:  # with nothing found there is nothing to review
             answer = QMessageBox.question(self, wording.UNREVIEWED_TITLE, wording.UNREVIEWED)
             if answer != QMessageBox.StandardButton.Yes:
                 return

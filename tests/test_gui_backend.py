@@ -121,7 +121,7 @@ def test_failures_become_messages_and_the_thread_survives(qtbot, backend, model,
     sc.save_vault(sc.new_vault(), vault_path)  # a plaintext vault
     with qtbot.waitSignal(backend.failed, timeout=10000) as signal:
         backend.open_matter(vault_path, PASSPHRASE)
-    assert "not an encrypted vault" in signal.args[1]
+    assert signal.args[1] == wording.for_staff("x is not an encrypted vault. Refusing to use it.") and "vault" not in signal.args[1]
 
     def no_model():
         raise sc.ModelNotFoundError("missing")

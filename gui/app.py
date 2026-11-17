@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -33,6 +33,34 @@ from PySide6.QtWidgets import (
 
 from gui import settings, wording
 from gui.workers import Backend
+
+
+MARGIN = 20  # outer margin of every screen
+SPACING = 12  # gap between rows on every screen
+
+STEP_PAST = "padding: 6px 10px; border-bottom: 3px solid palette(mid);"
+STEP_NOW = "padding: 6px 10px; font-weight: bold; border-bottom: 3px solid palette(highlight);"
+STEP_LATER = "padding: 6px 10px; color: palette(mid); border-bottom: 3px solid transparent;"
+STEP_NONE = "padding: 6px 10px; color: palette(mid); border-bottom: 3px solid transparent;"
+
+
+def app_icon() -> QIcon:
+    """A plain icon drawn in code: a page with a bar blacked out. No image files."""
+    pixmap = QPixmap(64, 64)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setBrush(QColor("#ffffff"))
+    painter.setPen(QColor("#3b5b8c"))
+    painter.drawRoundedRect(10, 4, 44, 56, 5, 5)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor("#9aa7b8"))
+    for top in (14, 40, 48):
+        painter.drawRect(18, top, 28, 4)
+    painter.setBrush(QColor("#1f2d44"))
+    painter.drawRect(18, 26, 28, 8)
+    painter.end()
+    return QIcon(pixmap)
 
 
 @dataclass
@@ -85,6 +113,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         # The title never includes a file or client name: it shows in the taskbar.
         self.setWindowTitle(wording.APP_NAME)
+        self.setWindowIcon(app_icon())
         self.resize(980, 680)
         self.session = Session()
         self.backend = backend or Backend(self)
@@ -92,11 +121,18 @@ class MainWindow(QMainWindow):
 
         self._step_labels = [QLabel(text) for text in wording.STEPS]
         bar = QHBoxLayout()
-        for label in self._step_labels:
+        bar.setSpacing(4)
+        for index, label in enumerate(self._step_labels):
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            bar.addWidget(label)
+            label.setStyleSheet(STEP_NONE)
+            label.setAccessibleName(
+                wording.A11Y_STEP.format(n=index + 1, total=len(wording.STEPS), name=wording.STEPS[index])
+            )
+            bar.addWidget(label, 1)
         self._stack = QStackedWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(MARGIN, 10, MARGIN, MARGIN)
+        layout.setSpacing(SPACING)
         layout.addLayout(bar)
         layout.addWidget(self._stack, 1)
         central = QWidget()
@@ -104,7 +140,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         lock = QAction(wording.LOCK, self)
+        lock.setShortcut(QKeySequence(wording.LOCK_SHORTCUT))
         lock.triggered.connect(self.lock)
+        self.lock_action = lock
         self.menuBar().addMenu(wording.APP_NAME).addAction(lock)
 
         self.backend.finished.connect(lambda job, result: self._route("on_finished", job, result))
@@ -130,6 +168,10 @@ class MainWindow(QMainWindow):
             font.setBold(index == screen.step)
             label.setFont(font)
             label.setEnabled(screen.step is not None and index <= screen.step)
+            if screen.step is None:
+                label.setStyleSheet(STEP_NONE)
+            else:
+                label.setStyleSheet(STEP_NOW if index == screen.step else STEP_PAST if index < screen.step else STEP_LATER)
         screen.enter()
 
     def _route(self, handler: str, *args) -> None:
@@ -191,6 +233,7 @@ def main() -> int:
     logging.basicConfig(filename=log_path(), level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     app = QApplication(sys.argv)
     app.setApplicationName(wording.APP_NAME)
+    app.setWindowIcon(app_icon())
     window = MainWindow()
     try:
         from gui.screens import install  # added in phase 1

@@ -273,19 +273,21 @@ phase 2's threading and the shell part of phase 1:
 - Tests drive the real widgets headless. Set `SCREENSHOT_DIR=some/folder` when
   running `tests/test_gui_screens.py` to get a PNG of every screen.
 
-**Left for the next session (Sonnet), phase 5 onward:**
+**Phase 5 is done** (`tests/test_gui_polish.py`):
 
-- Looks: spacing, button sizes, step bar styling, a proper drop area on
-  Choose, column widths in the review table, an icon.
-- Wording pass: messages raised by `sanitizer_service` and `sanitizer_core`
-  still say "vault" ("Wrong passphrase, or the vault file is damaged.") and
-  reach the window unchanged. Give the service its own user-facing wording or
-  translate in one place; do not patch strings in screens. "(1 time(s))"
-  plurals. The model column headers live in `gui/review_model.py`.
-- Keyboard access: tab order, shortcuts, Space to tick a row, Enter on forms.
-- Not built: a firm setting that disables *Accept all*; first-run walkthrough;
-  choosing the output file name or key format (the service takes both).
-- Then packaging on Windows and macOS (6) and the guide (7).
+- Service and core messages are put into staff words in one place,
+  `wording.for_staff`, called from `gui/workers.py`; the service and CLI keep
+  their own wording. Plurals go through `wording.plural` / `wording.times`.
+- Keyboard: Enter submits forms, Space ticks the selected review rows, Ctrl+F
+  focuses search, Alt+Left/Right steps the context, Ctrl+L locks, Esc cancels
+  a scan. Tab order and accessible names are set on every screen.
+- The firm can hide *Accept all* by setting `"allow_accept_all": false` in
+  `settings.json`; there is no control for it in the window.
+- Review with nothing found says so and still allows adding and continuing.
+
+**Left:** a first-run walkthrough and choosing the output file name or key
+format (the service takes both); then packaging on Windows and macOS (6) and
+the guide (7).
 
 ## Phases
 
@@ -298,7 +300,7 @@ Each phase ends with tests passing and a short entry in `PLAN.md`.
 | 2 | Scanning screen with progress bar and Cancel (worker thread, preload and cancel are done) | **Done** | See "Status" |
 | 3 | Review screen: table model, edit, add, filter, context stepping, unreviewed confirmation | **Done** | See "Status" |
 | 4 | Done screen, Restore flow, Key flow | **Done** | See "Status" |
-| 5 | Wording pass, keyboard access, error messages, empty and failure states | Sonnet | Mechanical once `wording.py` exists |
+| 5 | Wording pass, keyboard access, error messages, empty and failure states | **Done** | Mechanical once `wording.py` exists |
 | 6 | Packaging: Windows installer and macOS app, model bundled, offline check of the packaged app | **Opus** | Hardest to get right; see below |
 | 7 | User guide (two pages with screenshots) and a first-run walkthrough | Sonnet | |
 

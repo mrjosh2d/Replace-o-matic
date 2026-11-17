@@ -43,7 +43,25 @@ def remember_matter(path: str) -> None:
     path = os.path.abspath(path)
     paths = [path] + [p for p in recent_matters() if p != path]
     try:
+        try:
+            with open(_settings_path(), encoding="utf-8") as fh:
+                data = json.load(fh)
+            if not isinstance(data, dict):
+                data = {}
+        except (OSError, ValueError):
+            data = {}
+        data["recent_matters"] = paths[:MAX_RECENT]  # keep the firm's other settings
         with open(_settings_path(), "w", encoding="utf-8") as fh:
-            json.dump({"recent_matters": paths[:MAX_RECENT]}, fh)
+            json.dump(data, fh)
     except OSError:
         pass  # a list of recent files is a convenience, never a reason to fail
+
+
+def allow_accept_all() -> bool:
+    """False if the firm has set ``"allow_accept_all": false`` in settings.json: the
+    Accept all button is then hidden. There is no control for it in the window."""
+    try:
+        with open(_settings_path(), encoding="utf-8") as fh:
+            return json.load(fh).get("allow_accept_all", True) is not False
+    except (OSError, ValueError, AttributeError):
+        return True
