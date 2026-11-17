@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtWidgets import QCheckBox, QFormLayout, QLabel, QMessageBox, QVBoxLayout
+from PySide6.QtWidgets import QCheckBox, QFormLayout, QLabel, QMessageBox
 
 from gui import wording
-from gui.screens.common import FilePicker, MatterScreen, heading
+from gui.screens.common import FilePicker, MatterScreen, heading, page, tab_chain
 
 
 class KeyScreen(MatterScreen):
@@ -15,14 +15,15 @@ class KeyScreen(MatterScreen):
 
     def __init__(self, window):
         super().__init__(window, must_exist=True)
-        self.document = FilePicker(wording.DOCUMENT_FILES)
+        self.document = FilePicker(wording.DOCUMENT_FILES, name=wording.KEY_DOCUMENT)
+        self.document.submitted.connect(self.start)
         self.confidential = QCheckBox(wording.KEY_CONFIDENTIAL)
         self.safe = QCheckBox(wording.KEY_SAFE)
         self.go_button.setText(wording.KEY_MAKE)
         form = QFormLayout()
         form.addRow(wording.KEY_DOCUMENT, self.document)
         form.addRow("", QLabel(wording.KEY_DOCUMENT_HINT))
-        layout = QVBoxLayout(self)
+        layout = page(self)
         layout.addWidget(heading(wording.KEY_HEADING))
         layout.addLayout(form)
         layout.addWidget(self.form)
@@ -31,6 +32,8 @@ class KeyScreen(MatterScreen):
         layout.addWidget(self.message)
         layout.addStretch(1)
         layout.addLayout(self.buttons())
+        tab_chain(self.document.edit, self.document.button, *self.form.tab_widgets(), self.confidential, self.safe,
+                  self.back_button, self.go_button)  # fmt: skip
 
     def enter(self) -> None:
         super().enter()
@@ -68,7 +71,7 @@ class KeyScreen(MatterScreen):
         if job != "keys":
             return
         self.set_busy(False)
-        lines = [wording.KEY_DONE.format(count=result.count)]
+        lines = [wording.KEY_DONE.format(standins=wording.plural(result.count, "stand-in"))]
         if result.confidential_path:
             lines.append(wording.KEY_WROTE_CONFIDENTIAL.format(path=result.confidential_path))
         if result.safe_path:

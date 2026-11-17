@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
 from gui import wording
 from gui.app import Screen
-from gui.screens.common import heading
+from gui.screens.common import big, heading, page
 
 
 class ScanningScreen(Screen):
@@ -16,12 +17,14 @@ class ScanningScreen(Screen):
         super().__init__(window)
         self.status = QLabel(wording.LOADING_MODEL)
         self.bar = QProgressBar()
-        self.cancel_button = QPushButton(wording.CANCEL)
+        self.cancel_button = big(QPushButton(wording.CANCEL))
+        self.bar.setAccessibleName(wording.A11Y_PROGRESS)
+        self.cancel_button.setShortcut(QKeySequence("Esc"))
         self.cancel_button.clicked.connect(self.cancel)
         row = QHBoxLayout()
         row.addStretch(1)
         row.addWidget(self.cancel_button)
-        layout = QVBoxLayout(self)
+        layout = page(self)
         layout.addWidget(heading(wording.SCANNING))
         layout.addWidget(self.status)
         layout.addWidget(self.bar)

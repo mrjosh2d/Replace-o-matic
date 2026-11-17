@@ -12,7 +12,9 @@ import sanitizer_core as sc  # first project import: it sets the offline switche
 import sanitizer_service as service
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
 
-COLUMNS = ["", "Type", "Text", "Times", "Found by", "Same as"]
+from gui import wording
+
+COLUMNS = wording.REVIEW_COLUMNS
 TICK, TYPE, TEXT, TIMES, FOUND_BY, SAME_AS = range(6)
 TYPE_LABELS = {t: t.replace("_", " ").capitalize() for t in sc.ENTITY_TYPES}  # "Financial id"
 TYPE_LABELS.update({"financial_id": "ID number", "url": "Web address"})

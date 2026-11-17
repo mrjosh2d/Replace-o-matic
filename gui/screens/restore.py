@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtWidgets import QFormLayout, QVBoxLayout
+from PySide6.QtWidgets import QFormLayout
 
 from gui import wording
-from gui.screens.common import FilePicker, MatterScreen, heading
+from gui.screens.common import FilePicker, MatterScreen, heading, page, tab_chain
 
 
 class RestoreScreen(MatterScreen):
@@ -15,17 +15,19 @@ class RestoreScreen(MatterScreen):
 
     def __init__(self, window):
         super().__init__(window, must_exist=True)
-        self.document = FilePicker(wording.RESTORE_FILES)
+        self.document = FilePicker(wording.RESTORE_FILES, name=wording.RESTORE_FILE, browse_name="Browse for the file that came back")
+        self.document.submitted.connect(self.start)
         self.go_button.setText(wording.RESTORE)
         form = QFormLayout()
         form.addRow(wording.RESTORE_FILE, self.document)
-        layout = QVBoxLayout(self)
+        layout = page(self)
         layout.addWidget(heading(wording.RESTORE_HEADING))
         layout.addLayout(form)
         layout.addWidget(self.form)
         layout.addWidget(self.message)
         layout.addStretch(1)
         layout.addLayout(self.buttons())
+        tab_chain(self.document.edit, self.document.button, *self.form.tab_widgets(), self.back_button, self.go_button)
 
     def enter(self) -> None:
         super().enter()
@@ -49,7 +51,7 @@ class RestoreScreen(MatterScreen):
         if job != "restore":
             return
         self.set_busy(False)
-        lines = [wording.RESTORE_DONE.format(count=result.restored, path=result.output_path)]
+        lines = [wording.RESTORE_DONE.format(standins=wording.plural(result.restored, "stand-in"), path=result.output_path)]
         if result.altered:
             lines.append(wording.RESTORE_ALTERED.format(items=", ".join(result.altered)))
         if result.unknown:
