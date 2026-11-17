@@ -393,6 +393,11 @@ back as a PDF (`pdf_io.py`):
   is one string. This also removes the "PDF line break inside a name" limit
   noted in steps 4 and 6.
 - The written file is read back and must contain no vault value.
+- PyMuPDF makes no network connection (checked with `strace` during a redaction).
+
+With PDFs read this way, the reviewed-label score is 84 of 88 labels and 98.5%
+of sensitive characters. What is left is the firm's tagline (accepted as
+partial by the owner) and "FAMILY WEALTH TRUST" without a name.
 
 Limits of PDF output:
 
