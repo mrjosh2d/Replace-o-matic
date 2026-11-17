@@ -1,0 +1,28 @@
+<!--
+  Windows Sandbox with networking off, for the offline check of the installer.
+  Needs Windows 10/11 Pro, Enterprise or Education (not Home). See README.md.
+  Before opening it, put these in C:\ReplaceOMaticCheck on the host:
+    Replace-o-matic-Setup-<version>.exe   (dist\installer)
+    sandbox_check.ps1, gui_smoke.ps1      (packaging\windows)
+    invented-letter.docx, invented-memo.pdf (make_test_documents.py)
+  The folder is mapped read-only. The result is written inside the sandbox to
+  Desktop\offline-check-result.txt; everything is discarded when it closes.
+-->
+<Configuration>
+  <Networking>Disable</Networking>
+  <vGPU>Disable</vGPU>
+  <ClipboardRedirection>Disable</ClipboardRedirection>
+  <PrinterRedirection>Disable</PrinterRedirection>
+  <AudioInput>Disable</AudioInput>
+  <VideoInput>Disable</VideoInput>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\ReplaceOMaticCheck</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\check</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell -ExecutionPolicy Bypass -File C:\Users\WDAGUtilityAccount\Desktop\check\sandbox_check.ps1</Command>
+  </LogonCommand>
+</Configuration>
