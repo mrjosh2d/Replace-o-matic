@@ -3,7 +3,10 @@ __pycache__/
 .pytest_cache/
 
 # Vaults hold the real names and numbers. Never commit them.
-*vault*.json
+*vault*
+!tests/test_cli_and_vault.py
+*.sanitized.txt
+*.rehydrated.txt
 
 # Local model weights
 models/
