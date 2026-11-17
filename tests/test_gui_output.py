@@ -260,3 +260,95 @@ def test_new_strings_use_staff_words():
         for piece in pieces:
             for text in piece if isinstance(piece, tuple) else [piece]:
                 assert not banned.search(text), name
+
+
+# ---- a file that is already there
+
+def answer_replace(monkeypatch, answer):
+    """Make the "already exists" question return ``answer``; the list collects what it showed."""
+    from gui.screens import common
+
+    asked = []
+
+    def fake(parent, existing, successors):
+        asked.append((existing, successors))
+        return answer
+
+    monkeypatch.setattr(common, "ask_replace", fake)
+    return asked
+
+
+@pytest.mark.parametrize("answer", ["new", "replace", "cancel"])
+def test_review_asks_before_replacing_an_existing_output(qtbot, window, case, monkeypatch, answer):
+    doc, matter = case
+    review = to_review(qtbot, window, doc, matter)
+    default = service.default_output_path(doc, "sanitized")
+    with open(default, "w", encoding="utf-8") as fh:
+        fh.write("earlier result")
+    asked = answer_replace(monkeypatch, answer)
+    review.table.selectRow(0)
+    qtbot.mouseClick(review.sanitize_button, LEFT)
+    successor = service.successor_path(default)
+    assert asked == [([default], [successor])]
+    if answer == "cancel":
+        assert window.current().name == "review" and not window.backend.busy
+        assert not os.path.exists(matter) and open(default, encoding="utf-8").read() == "earlier result"
+        return
+    qtbot.waitUntil(lambda: window.current().name == "done", timeout=10000)
+    result = window.session.result
+    if answer == "new":
+        assert result.output_path == successor and open(default, encoding="utf-8").read() == "earlier result"
+    else:
+        assert result.output_path == default and "John A. Smith" not in open(default, encoding="utf-8").read()
+
+
+def test_review_does_not_ask_when_the_name_was_picked_in_the_save_dialog(qtbot, window, case, monkeypatch):
+    doc, matter = case
+    review = to_review(qtbot, window, doc, matter)
+    custom = os.path.join(os.path.dirname(doc), "picked.txt")
+    with open(custom, "w", encoding="utf-8") as fh:
+        fh.write("old")
+    pick(monkeypatch, custom)
+    qtbot.mouseClick(review.output.button, LEFT)
+    asked = answer_replace(monkeypatch, "cancel")
+    result = reviewed_done(qtbot, window)
+    assert asked == [] and result.output_path == custom  # the Save dialog already asked
+
+
+def test_key_saves_a_new_file_beside_an_existing_key(qtbot, window, tmp_path, monkeypatch):
+    safe_path, matter = sanitized_case(tmp_path)
+    qtbot.mouseClick(window.screens["start"].key_button, LEFT)
+    key = window.screens["key"]
+    key.document.set_path("")
+    key.form.picker.set_path(matter)
+    key.form.passphrase.setText(PASSPHRASE)
+    key.format.setCurrentIndex(key.format.findData("txt"))
+    key.safe.setChecked(True)
+    confidential, safe = service.key_paths(None, matter, "txt")
+    with open(confidential, "w", encoding="utf-8") as fh:
+        fh.write("earlier key")
+    successor = service.successor_path(confidential)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
+    asked = answer_replace(monkeypatch, "new")
+    qtbot.mouseClick(key.go_button, LEFT)
+    qtbot.waitUntil(lambda: "Confidential key:" in key.message.text(), timeout=10000)
+    assert asked == [([confidential], [successor])]  # only the one that exists
+    assert open(confidential, encoding="utf-8").read() == "earlier key"
+    assert os.path.exists(successor) and os.path.exists(safe)
+
+
+def test_restore_cancel_on_existing_output_writes_nothing(qtbot, window, tmp_path, monkeypatch):
+    safe_path, matter = sanitized_case(tmp_path)
+    qtbot.mouseClick(window.screens["start"].restore_button, LEFT)
+    restore = window.screens["restore"]
+    restore.document.set_path(safe_path)
+    default = service.default_output_path(safe_path, "rehydrated")
+    with open(default, "w", encoding="utf-8") as fh:
+        fh.write("earlier")
+    restore.form.picker.set_path(matter)
+    restore.form.passphrase.setText(PASSPHRASE)
+    asked = answer_replace(monkeypatch, "cancel")
+    qtbot.mouseClick(restore.go_button, LEFT)
+    qtbot.waitUntil(lambda: bool(asked), timeout=10000)
+    qtbot.waitUntil(lambda: not window.backend.busy, timeout=10000)
+    assert open(default, encoding="utf-8").read() == "earlier" and restore.go_button.isEnabled()

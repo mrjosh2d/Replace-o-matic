@@ -7,7 +7,7 @@ import os
 from PySide6.QtWidgets import QFormLayout
 
 from gui import wording
-from gui.screens.common import FilePicker, MatterScreen, OutputRow, heading, page, tab_chain
+from gui.screens.common import FilePicker, MatterScreen, OutputRow, confirm_outputs, heading, page, tab_chain
 
 
 class RestoreScreen(MatterScreen):
@@ -56,8 +56,15 @@ class RestoreScreen(MatterScreen):
         return self.output.check()
 
     def proceed(self) -> None:
+        output = self.output.path()
+        if not self.output.picked:  # a name picked in the Save dialog was confirmed there
+            chosen = confirm_outputs(self, [output])
+            if chosen is None:
+                self.set_busy(False)
+                return
+            output = chosen[0]
         self.set_busy(True)
-        self.backend.restore(self.document.path(), self.session.vault, self.output.path())
+        self.backend.restore(self.document.path(), self.session.vault, output)
 
     def on_finished(self, job: str, result) -> None:
         super().on_finished(job, result)

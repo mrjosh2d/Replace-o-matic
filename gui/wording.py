@@ -270,3 +270,10 @@ INTRO_PAGES = [
         "names. Keep them on this computer.",
     ),
 ]
+
+# ---- a file that is already there
+REPLACE_TITLE = "The file already exists"
+REPLACE_TEXT = "This file is already there:\n{existing}\n\nSave a new file beside it, or replace it?"
+REPLACE_NEW_NAMES = "The new file would be:\n{names}"
+REPLACE_SAVE_NEW = "Save as &new file"
+REPLACE_REPLACE = "&Replace it"

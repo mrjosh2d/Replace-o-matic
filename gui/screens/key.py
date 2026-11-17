@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import os
 
+import sanitizer_service as service
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLabel, QMessageBox
 
 from gui import settings, wording
-from gui.screens.common import FilePicker, MatterScreen, heading, page, tab_chain
+from gui.screens.common import FilePicker, MatterScreen, confirm_outputs, heading, page, tab_chain
 
 
 class KeyScreen(MatterScreen):
@@ -65,7 +66,15 @@ class KeyScreen(MatterScreen):
                 self.set_busy(False)
                 self.message.setText("")
                 return
-        settings.set_key_format(self.format.currentData())
+        fmt = self.format.currentData()
+        settings.set_key_format(fmt)
+        defaults = service.key_paths(self.document.path() or None, self.session.matter_path, fmt)
+        wanted = [path if box.isChecked() else None for path, box in zip(defaults, (self.confidential, self.safe))]
+        chosen = confirm_outputs(self, wanted)
+        if chosen is None:
+            self.set_busy(False)
+            self.message.setText("")
+            return
         self.set_busy(True)
         self.backend.write_keys(
             self.session.vault,
@@ -73,7 +82,9 @@ class KeyScreen(MatterScreen):
             self.session.matter_path,
             confidential=self.confidential.isChecked(),
             safe=self.safe.isChecked(),
-            fmt=self.format.currentData(),
+            fmt=fmt,
+            confidential_path=chosen[0],
+            safe_path=chosen[1],
         )
 
     def on_finished(self, job: str, result) -> None:

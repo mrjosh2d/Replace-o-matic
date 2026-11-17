@@ -291,6 +291,9 @@ phase 2's threading and the shell part of phase 1:
 CLI: no output may replace the original document or the matter file. The Key
 screen chooses .docx, .csv or .txt and remembers it. `gui/intro.py` shows four
 short pages on first run; *Help > How Replace-o-matic works* reopens them.
+If an output already exists (and was not picked in the Save dialog, which
+asks itself), the window asks: *Save as new file* (`case (2).sanitized.docx`,
+from `service.successor_path`), *Replace it*, or Cancel. Keys too.
 
 **Left:** packaging on Windows and macOS (6) and the guide (7).
 

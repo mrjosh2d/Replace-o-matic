@@ -137,6 +137,26 @@ def output_formats(input_path: str, label: str) -> list[str]:
     return [".txt"]
 
 
+_OUTPUT_LABELS = (".key-safe", ".sanitized", ".rehydrated", ".key")  # longest match first
+
+
+def successor_path(path: str) -> str:
+    """The first free name beside ``path`` with a number added: ``case.sanitized.docx``
+    becomes ``case (2).sanitized.docx``, so the label (and .gitignore) still match."""
+    stem, extension = os.path.splitext(path)
+    label = next((lab for lab in _OUTPUT_LABELS if stem.endswith(lab)), "")
+    stem = stem[: len(stem) - len(label)]
+    number = 2
+    while os.path.exists(candidate := f"{stem} ({number}){label}{extension}"):
+        number += 1
+    return candidate
+
+
+def key_paths(document_path: str | None, vault_path: str, fmt: str = "docx") -> tuple[str, str]:
+    """The default confidential and safe key paths."""
+    stem = os.path.splitext(document_path or vault_path)[0]
+    return f"{stem}.key.{fmt}", f"{stem}.key-safe.{fmt}"
+
 def _same_file(a: str, b: str) -> bool:
     try:
         return os.path.samefile(a, b)
@@ -471,16 +491,16 @@ def write_keys(
     the placeholders that appear in it are listed."""
     text = read_document(document_path) if document_path else None
     about = f" for {os.path.basename(document_path)}" if document_path else ""
-    stem = os.path.splitext(document_path or vault_path)[0]
+    default_confidential, default_safe = key_paths(document_path, vault_path, fmt)
     count = 0
     written: list[str | None] = [None, None]
     if confidential:
-        written[0] = confidential_path or f"{stem}.key.{fmt}"
+        written[0] = confidential_path or default_confidential
         header, rows = build_key(vault, text, values=True)
         write_key(written[0], "Key" + about, CONFIDENTIAL_NOTE, header, rows, private=True)
         count = len(rows)
     if safe:
-        written[1] = safe_path or f"{stem}.key-safe.{fmt}"
+        written[1] = safe_path or default_safe
         header, rows = build_key(vault, text, values=False)
         write_key(written[1], "Key (no real values)" + about, SAFE_NOTE, header, rows, private=False)
         count = len(rows)

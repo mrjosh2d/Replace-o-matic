@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 from gui import settings, wording
 from gui.app import Screen
 from gui.review_model import FOUND_BY, SAME_AS, TEXT, TICK, TIMES, TYPE, TYPE_LABELS, ReviewTableModel
-from gui.screens.common import OutputRow, big, message_label, page, tab_chain
+from gui.screens.common import OutputRow, big, confirm_outputs, message_label, page, tab_chain
 
 
 def type_combo(parent=None) -> QComboBox:
@@ -365,11 +365,17 @@ class ReviewScreen(Screen):
             answer = QMessageBox.question(self, wording.UNREVIEWED_TITLE, wording.UNREVIEWED)
             if answer != QMessageBox.StandardButton.Yes:
                 return
+        output = self.output.path()
+        if not self.output.picked:  # a name picked in the Save dialog was confirmed there
+            chosen = confirm_outputs(self, [output])
+            if chosen is None:
+                return
+            output = chosen[0]
         self._set_busy(True)
         self.message.setText(wording.WORKING)
         session = self.session
         self.backend.commit(session.scan, accepted, declined, reviewed, session.matter_path, session.passphrase,
-                            self.output.path())
+                            output)
 
     def on_finished(self, job: str, result) -> None:
         if job == "commit":

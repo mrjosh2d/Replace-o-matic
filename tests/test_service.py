@@ -194,3 +194,15 @@ def test_output_formats_follow_the_input():
     assert service.output_formats("a.pdf", "rehydrated") == [".txt"]
     assert service.check_output_path("a.docx", "b.docx", "sanitized") is None
     assert "cannot be written" in service.check_output_path("a.txt", "b.pdf", "sanitized")
+
+
+def test_successor_path_keeps_the_label_so_gitignore_still_matches(tmp_path):
+    out = tmp_path / "case.sanitized.docx"
+    assert service.successor_path(str(out)) == str(tmp_path / "case (2).sanitized.docx")
+    out.write_text("x")
+    (tmp_path / "case (2).sanitized.docx").write_text("x")
+    assert service.successor_path(str(out)) == str(tmp_path / "case (3).sanitized.docx")
+    assert service.successor_path(str(tmp_path / "m.key-safe.csv")) == str(tmp_path / "m (2).key-safe.csv")
+    assert service.successor_path(str(tmp_path / "notes.md")) == str(tmp_path / "notes (2).md")
+    assert service.key_paths(None, str(tmp_path / "m.vault"), "txt") == (
+        str(tmp_path / "m.key.txt"), str(tmp_path / "m.key-safe.txt"))

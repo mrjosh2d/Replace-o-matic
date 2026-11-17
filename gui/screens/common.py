@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -123,6 +124,34 @@ class FilePicker(QWidget):
             path, _ = QFileDialog.getOpenFileName(self, wording.APP_NAME, start, self.file_filter)
         if path:
             self.set_path(path)
+
+
+def ask_replace(parent, existing: list[str], successors: list[str]) -> str:
+    """Ask what to do about outputs that already exist: "new", "replace" or "cancel"."""
+    box = QMessageBox(QMessageBox.Icon.Question, wording.REPLACE_TITLE,
+                      wording.REPLACE_TEXT.format(existing="\n".join(existing)), parent=parent)  # fmt: skip
+    box.setInformativeText(wording.REPLACE_NEW_NAMES.format(names="\n".join(os.path.basename(p) for p in successors)))
+    new = box.addButton(wording.REPLACE_SAVE_NEW, QMessageBox.ButtonRole.AcceptRole)
+    replace = box.addButton(wording.REPLACE_REPLACE, QMessageBox.ButtonRole.DestructiveRole)
+    box.addButton(QMessageBox.StandardButton.Cancel)
+    box.setDefaultButton(new)
+    box.exec()
+    return {new: "new", replace: "replace"}.get(box.clickedButton(), "cancel")
+
+
+def confirm_outputs(parent, paths: list[str | None]) -> list[str | None] | None:
+    """``paths`` as they should be used, with any that already exist replaced by a new
+    name if the user chooses that, or None if they cancel. Nothing exists: no question."""
+    existing = [p for p in paths if p and os.path.exists(p)]
+    if not existing:
+        return paths
+    successors = {p: service.successor_path(p) for p in existing}
+    answer = ask_replace(parent, existing, list(successors.values()))
+    if answer == "cancel":
+        return None
+    if answer == "replace":
+        return paths
+    return [successors.get(p, p) if p else p for p in paths]
 
 
 class OutputRow(QWidget):
