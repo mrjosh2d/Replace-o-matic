@@ -5,7 +5,9 @@ __pycache__/
 # Vaults hold the real names and numbers. Never commit them.
 *vault*
 !tests/test_cli_and_vault.py
-*.sanitized.txt
+*.sanitized.*
+*.key.*
+*.key-safe.*
 *.rehydrated.txt
 
 # Local model weights

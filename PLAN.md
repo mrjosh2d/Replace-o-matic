@@ -14,7 +14,7 @@ machine, and swapped back afterwards using a local JSON vault.
 | 4 | Human review, "I'm feeling lucky", encrypted vault, command-line tool, .docx/PDF input | **Done** |
 | 5 | .docx in, .docx out with formatting kept; headers, footers, footnotes, endnotes, comments | **Done** |
 | 6 | Labelled measurement on real documents; web addresses, middle names, bank names | **Done** |
-| 7 | Key document: placeholder-to-value table to read alongside a sanitized document | Next |
+| 7 | Key document: confidential and safe placeholder tables | **Done** |
 
 ## Step 1: deterministic core (done)
 
@@ -295,7 +295,8 @@ Limits:
   `rehydrate` the full value sits on that first line.
 - Text inside embedded objects (charts, embedded spreadsheets, images) is not
   touched. Field codes and hyperlink targets are not touched, only visible text.
-- Opened in LibreOffice here; the owner confirmed it looks right in Microsoft Word.
+- Opened in LibreOffice here; the owner confirmed it looks right in Microsoft Word. With bank names caught, the reviewed-label score is 83 of
+88 labels and 98.2% of sensitive characters.
 
 ## Step 6: labelled measurement on real documents (done)
 
@@ -350,25 +351,26 @@ emails), and the labels have now been used to fix things. They show the tool
 handles this kind of estate-planning document well; they do not replace the
 90% unseen-text figure from step 3 for documents of a new kind.
 
-## Step 7: key document (next)
+## Step 7: key document (done)
 
-A "key" to read alongside a sanitized document or an analysis of it: a table of
-placeholder, type and real value, grouped so that aliases of one entity sit
-together (`[COMPANY_1]` Acme Corporation; `[COMPANY_1_ALIAS_1]` Acme Corp.).
+```
+.venv/bin/python sanitizer_cli.py key contract.sanitized.docx --vault matter.vault
+```
 
-- `sanitizer_cli.py key --vault matter.vault -o key.docx` (also .csv / .txt).
-  With a document argument, only the placeholders that appear in that
-  document are listed, in order of first appearance, with a count.
-- The key holds the real names, so it is as sensitive as the vault. It is
-  written owner-only, marked CONFIDENTIAL at the top, and gitignored. It must
-  never be sent with the sanitized document.
-- A second, safe variant (`--no-values`) lists placeholder, type and which
-  placeholders are the same entity, with no real values. That one can be given
-  to an LLM together with the sanitized text, so it knows `[PERSON_1_ALIAS_1]`
-  is the same person as `[PERSON_1]`.
+Writes two tables of what each placeholder stands for, with aliases listed
+under their entity and a "Same as" column pointing at it:
 
-To confirm with the owner: whether "key" means the confidential one, the safe
-one, or both.
+- **Confidential key** (`<document>.key.docx`): placeholder, type, real value,
+  same-as, and how many times it appears. It holds the real names, so it is as
+  sensitive as the vault: marked CONFIDENTIAL at the top, written owner-only,
+  gitignored. It must never be sent with the sanitized document.
+- **Safe key** (`<document>.key-safe.docx`): the same table without the real
+  values. It can accompany the sanitized text, so a reader or an LLM knows that
+  `[PERSON_1_ALIAS_1]` is the same person as `[PERSON_1]`.
+
+Given a document (sanitized or original), only its placeholders are listed, in
+order of first appearance. With no document the whole vault is listed.
+`--format csv` or `txt`, `--confidential-only`, `--safe-only`.
 
 ## Later
 

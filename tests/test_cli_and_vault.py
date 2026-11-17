@@ -343,3 +343,68 @@ def test_empty_document_is_reported(tmp_path):
     path.write_text("  \n")
     with pytest.raises(SystemExit, match="No text found"):
         cli.read_document(str(path))
+
+
+# ---------------------------------------------------------------- key document
+
+
+def make_case(tmp_path):
+    doc = tmp_path / "case.txt"
+    doc.write_text(TEXT)
+    vault_path = str(tmp_path / "matter.vault")
+    run(["sanitize", str(doc), "--vault", vault_path, "--lucky"])
+    return str(tmp_path / "case.sanitized.txt"), vault_path
+
+
+def test_key_writes_confidential_and_safe_tables(tmp_path):
+    import csv
+    import stat
+
+    sanitized, vault_path = make_case(tmp_path)
+    code, printed = run(["key", sanitized, "--vault", vault_path, "--format", "csv"])
+    assert code == 0 and "CONFIDENTIAL" in printed
+
+    confidential = tmp_path / "case.sanitized.key.csv"
+    safe = tmp_path / "case.sanitized.key-safe.csv"
+    rows = list(csv.reader(open(confidential, encoding="utf-8-sig")))
+    assert rows[0][0].startswith("CONFIDENTIAL")
+    assert rows[1] == ["Placeholder", "Type", "Real value", "Same as", "Times in document"]
+    table = {r[0]: r for r in rows[2:]}
+    assert table["[PERSON_1]"][2] == "John A. Smith" and table["[PERSON_1]"][3] == ""
+    assert table["[PERSON_1_ALIAS_1]"][2:5] == ["Smith", "[PERSON_1]", "1"]
+    assert table["[COMPANY_1_ALIAS_1]"][2:4] == ["Acme", "[COMPANY_1]"]
+    assert [r[0] for r in rows[2:4]] == ["[PERSON_1]", "[PERSON_1_ALIAS_1]"]  # aliases sit under their entity
+    assert stat.S_IMODE(confidential.stat().st_mode) == 0o600
+
+    safe_text = safe.read_text(encoding="utf-8-sig")
+    for real in ("Smith", "Acme", "123-45-6789", "Arbitration"):
+        assert real not in safe_text
+    assert "[PERSON_1_ALIAS_1],person,[PERSON_1],1" in safe_text
+
+
+def test_key_lists_only_placeholders_in_the_document_and_works_from_the_original(tmp_path):
+    sanitized, vault_path = make_case(tmp_path)
+    other = tmp_path / "answer.txt"
+    other.write_text("Only [COMPANY_1] and [PERSON_1] matter; [PERSON_1] twice. Ignore [PERSON_99].")
+    vault = sc.load_vault(vault_path, passphrase=PASSPHRASE)
+    header, rows = cli.build_key(vault, other.read_text())
+    assert [(r[0], r[-1]) for r in rows] == [("[COMPANY_1]", 1), ("[PERSON_1]", 2)]
+    # given the original instead of the sanitized text, the same key comes out
+    assert cli.build_key(vault, TEXT) == cli.build_key(vault, open(sanitized).read())
+    # with no document, the whole vault is listed and there is no count column
+    header, rows = cli.build_key(vault)
+    assert header[-1] == "Same as" and len(rows) == len(vault["mappings"])
+
+
+def test_key_docx_and_txt_formats(tmp_path):
+    sanitized, vault_path = make_case(tmp_path)
+    run(["key", sanitized, "--vault", vault_path])
+    text = cli.read_document(str(tmp_path / "case.sanitized.key.docx"))
+    assert "CONFIDENTIAL" in text and "John A. Smith" in text and "[PERSON_1_ALIAS_1]" in text
+    safe = cli.read_document(str(tmp_path / "case.sanitized.key-safe.docx"))
+    assert "Smith" not in safe and "[PERSON_1]" in safe
+
+    run(["key", sanitized, "--vault", vault_path, "--format", "txt", "--safe-only"])
+    assert not (tmp_path / "case.sanitized.key.txt").exists()
+    lines = (tmp_path / "case.sanitized.key-safe.txt").read_text()
+    assert "[PERSON_1_ALIAS_1]  (person)  [same person as [PERSON_1]]" in lines

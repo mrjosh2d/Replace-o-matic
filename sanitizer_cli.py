@@ -4,10 +4,13 @@
     python sanitizer_cli.py sanitize contract.docx --vault matter.vault --lucky
     python sanitizer_cli.py rehydrate answer.txt --vault matter.vault
     python sanitizer_cli.py vault --vault matter.vault
+    python sanitizer_cli.py key contract.sanitized.docx --vault matter.vault
 
 ``sanitize`` scans the document, lets you review what it found, saves the
 accepted items to the encrypted vault and writes a redacted text file.
 ``rehydrate`` puts the real values back into a text that contains placeholders.
+``key`` writes two tables of what each placeholder stands for: a confidential
+one with the real values, and a safe one without them.
 
 Reads .txt, .docx and .pdf. A .docx is written back as a .docx with its
 formatting intact; other inputs are written as plain text. Nothing here uses
@@ -325,6 +328,109 @@ def cmd_vault(args, ask, out, get) -> int:
     return 0
 
 
+CONFIDENTIAL_NOTE = (
+    "CONFIDENTIAL. This key contains the real names and numbers. Keep it on this machine; "
+    "never send it with the sanitized document."
+)
+SAFE_NOTE = (
+    "Safe key: no real values. It only shows which placeholders refer to the same person, "
+    "company or item, and may accompany the sanitized document."
+)
+
+
+def build_key(vault: dict, text: str | None = None, values: bool = True) -> tuple[list[str], list[list]]:
+    """Table for a key document: one row per placeholder, aliases under their entity.
+
+    With ``text`` (a sanitized document, or the original), only placeholders
+    that occur in it are listed, in order of first appearance, with a count.
+    """
+    mappings = vault["mappings"]
+    counts: Counter = Counter()
+    first: dict[str, int] = {}
+    if text is not None:
+        found = [(m.start(), m.group(0)) for m in sc.PLACEHOLDER_RE.finditer(text) if m.group(0) in mappings]
+        if not found:  # an original document: work out what would be replaced
+            found = [(start, placeholder) for start, _, placeholder in sc.find_vault_spans(text, vault)]
+        for position, placeholder in found:
+            counts[placeholder] += 1
+            first.setdefault(placeholder, position)
+
+    entities: dict[str, list[str]] = {}
+    for placeholder, entry in mappings.items():
+        if text is None or placeholder in counts:
+            entities.setdefault(entry["entity"], []).append(placeholder)
+    order = sorted(entities, key=lambda e: min(first.get(p, 0) for p in entities[e])) if text is not None else list(entities)
+
+    header = ["Placeholder", "Type"] + (["Real value"] if values else []) + ["Same as"]
+    header += ["Times in document"] if text is not None else []
+    rows = []
+    for entity in order:
+        main = f"[{entity}]"
+        members = sorted(entities[entity], key=lambda p: p != main)  # stable: vault order otherwise
+        for placeholder in members:
+            entry = mappings[placeholder]
+            row = [placeholder, entry["type"].replace("_", " ")]
+            if values:
+                row.append(" ".join(entry["value"].split()))
+            row.append("" if placeholder == main else main)
+            if text is not None:
+                row.append(counts[placeholder])
+            rows.append(row)
+    return header, rows
+
+
+def write_key(path: str, title: str, note: str, header: list[str], rows: list[list], private: bool) -> None:
+    extension = os.path.splitext(path)[1].lower()
+    if extension == ".docx":
+        docx_io.write_table_docx(path, title, [note, f"{len(rows)} placeholder(s)."], header, rows)
+    elif extension == ".csv":
+        import csv
+
+        with open(path, "w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerows([[note], header] + rows)
+    else:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(f"{title}\n{note}\n\n")
+            for row in rows:
+                cells = dict(zip(header, row))
+                line = f"{cells['Placeholder']}  ({cells['Type']})"
+                if "Real value" in cells:
+                    line += f"  =  {cells['Real value']}"
+                if cells["Same as"]:
+                    line += f"  [same {cells['Type']} as {cells['Same as']}]"
+                fh.write(line + "\n")
+    if private:
+        os.chmod(path, 0o600)
+
+
+def cmd_key(args, ask, out, get) -> int:
+    if not os.path.exists(args.vault):
+        raise SystemExit(f"No vault at {args.vault}")
+    vault, _ = _open_vault(args.vault, get)
+    text = read_document(args.document) if args.document else None
+    about = f" for {os.path.basename(args.document)}" if args.document else ""
+    stem = os.path.splitext(args.document or args.vault)[0]
+    extension = f".{args.format}"
+
+    written = []
+    if not args.safe_only:
+        path = args.output or f"{stem}.key{extension}"
+        header, rows = build_key(vault, text, values=True)
+        write_key(path, "Key" + about, CONFIDENTIAL_NOTE, header, rows, private=True)
+        written.append(("Confidential key", path, len(rows)))
+    if not args.confidential_only:
+        path = args.safe_output or f"{stem}.key-safe{extension}"
+        header, rows = build_key(vault, text, values=False)
+        write_key(path, "Key (no real values)" + about, SAFE_NOTE, header, rows, private=False)
+        written.append(("Safe key", path, len(rows)))
+    for label, path, count in written:
+        out(f"{label}: {path} ({count} placeholder(s))")
+    if not args.safe_only:
+        out(CONFIDENTIAL_NOTE)
+    return 0
+
+
 def main(argv=None, ask=input, out=print, get=getpass.getpass) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -349,6 +455,17 @@ def main(argv=None, ask=input, out=print, get=getpass.getpass) -> int:
     vault.add_argument("--vault", required=True)
     vault.add_argument("--show-values", action="store_true", help="print the real values too")
     vault.set_defaults(run=cmd_vault)
+
+    key = commands.add_parser("key", help="write a key: what each placeholder stands for")
+    key.add_argument("document", nargs="?", help="sanitized (or original) document: list only its placeholders")
+    key.add_argument("--vault", required=True)
+    key.add_argument("--format", choices=["docx", "csv", "txt"], default="docx")
+    key.add_argument("-o", "--output", help="confidential key path (default: <document>.key.<format>)")
+    key.add_argument("--safe-output", help="safe key path (default: <document>.key-safe.<format>)")
+    only = key.add_mutually_exclusive_group()
+    only.add_argument("--confidential-only", action="store_true", help="skip the safe key")
+    only.add_argument("--safe-only", action="store_true", help="write only the key without real values")
+    key.set_defaults(run=cmd_key)
 
     args = parser.parse_args(argv)
     try:

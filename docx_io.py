@@ -130,3 +130,83 @@ def rewrite_docx(
                 data = _scrub_metadata(item.filename, data)
             out.writestr(item, data)
     return total
+
+
+# --------------------------------------------------------------------------
+# Writing a simple .docx from scratch (used for the key document)
+# --------------------------------------------------------------------------
+
+_CONTENT_TYPES = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    '<Default Extension="xml" ContentType="application/xml"/>'
+    '<Override PartName="/word/document.xml" ContentType='
+    '"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
+)
+_RELS = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"'
+    ' Target="word/document.xml"/></Relationships>'
+)
+
+
+def write_table_docx(path: str, title: str, notes: list[str], header: list[str], rows: list[list]) -> None:
+    """A landscape .docx with a title, a few note lines and one bordered table."""
+    w = W[1:-1]
+
+    def run(text, bold=False, size=None, color=None):
+        r = etree.Element(W + "r")
+        if bold or size or color:
+            props = etree.SubElement(r, W + "rPr")
+            if bold:
+                etree.SubElement(props, W + "b")
+            if color:
+                etree.SubElement(props, W + "color").set(W + "val", color)
+            if size:
+                etree.SubElement(props, W + "sz").set(W + "val", str(size * 2))
+        t = etree.SubElement(r, W + "t")
+        t.text = str(text)
+        t.set(XML_SPACE, "preserve")
+        return r
+
+    def paragraph(text, **style):
+        p = etree.Element(W + "p")
+        p.append(run(text, **style))
+        return p
+
+    document = etree.Element(W + "document", nsmap={"w": w})
+    body = etree.SubElement(document, W + "body")
+    body.append(paragraph(title, bold=True, size=16))
+    for i, note in enumerate(notes):
+        body.append(paragraph(note, bold=i == 0, color="C00000" if i == 0 else None))
+    body.append(paragraph(""))
+
+    table = etree.SubElement(body, W + "tbl")
+    props = etree.SubElement(table, W + "tblPr")
+    etree.SubElement(props, W + "tblW").attrib.update({W + "w": "5000", W + "type": "pct"})
+    borders = etree.SubElement(props, W + "tblBorders")
+    for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        etree.SubElement(borders, W + side).attrib.update(
+            {W + "val": "single", W + "sz": "4", W + "space": "0", W + "color": "808080"}
+        )
+    for n, cells in enumerate([header] + rows):
+        tr = etree.SubElement(table, W + "tr")
+        if n == 0:
+            etree.SubElement(etree.SubElement(tr, W + "trPr"), W + "tblHeader")  # repeat on each page
+        for cell in cells:
+            tc = etree.SubElement(tr, W + "tc")
+            tc.append(paragraph(cell, bold=n == 0))
+
+    section = etree.SubElement(body, W + "sectPr")
+    etree.SubElement(section, W + "pgSz").attrib.update(
+        {W + "w": "15840", W + "h": "12240", W + "orient": "landscape"}
+    )
+    etree.SubElement(section, W + "pgMar").attrib.update(
+        {W + k: "1080" for k in ("top", "right", "bottom", "left")} | {W + "header": "720", W + "footer": "720", W + "gutter": "0"}
+    )
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as out:
+        out.writestr("[Content_Types].xml", _CONTENT_TYPES)
+        out.writestr("_rels/.rels", _RELS)
+        out.writestr("word/document.xml", etree.tostring(document, xml_declaration=True, encoding="UTF-8", standalone=True))
