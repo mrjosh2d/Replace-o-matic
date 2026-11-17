@@ -145,13 +145,20 @@ Without Sandbox, copy the same files to a clean VM or PC, switch its network
 off, and run
 `powershell -ExecutionPolicy Bypass -File sandbox_check.ps1 -Out <empty folder>`.
 
-**Result: not done yet.** The build PC runs Windows 11 Home, which has no
-Sandbox, and the network-off run on it is still to do.
+**Result, 17 November 2026: passed with the network off.** The build PC runs
+Windows 11 Home, which has no Sandbox, so the check ran there with Wi-Fi off
+and every physical adapter disconnected. It installed from the installer, ran
+`--self-test`, and passed the full window run. The sanitized files held none
+of the invented names, and the restore was exact. The Tailscale VPN adapter
+stayed "Up" with no link under it, which the first version of the script
+wrongly took for a live network. See `results\offline-2026-11-17.txt`. The
+Sandbox run itself is still to do on a Pro machine.
 
 ## Open items
 
-- **Network-off run:** on a Pro machine with the .wsb, on a clean VM, or on the
-  build PC with Wi-Fi off.
+- **Clean-machine run:** the network-off check passed on the build PC. Repeat it
+  in Sandbox (Pro machine) or on a clean VM, which starts with nothing
+  installed.
 - **Code-signing certificate** for the firm, then sign as above. Until then,
   staff see SmartScreen, and Smart App Control PCs cannot run the app.
 - **PyMuPDF is AGPL.** That is fine inside the firm. Before the installer goes

@@ -246,7 +246,7 @@ phase 2's threading and the shell part of phase 1:
   exits 0. Run under `strace`, the packaged app made no outbound connection,
   and it contains no PyTorch, transformers, gliner, QtNetwork or WebEngine.
 - Still to do for phase 6: macOS (build, `.dmg`, sign, notarise), signing on
-  Windows, and the network-off run on Windows.
+  Windows, and a clean-machine run on Windows.
 
 **Windows is built and checked** (`packaging/windows/`; steps and results in
 its `README.md`):
@@ -260,8 +260,9 @@ its `README.md`):
   SmartScreen warns.
 - `gui_smoke.ps1` drives the installed app through its window (new matter,
   .docx, keys, restore, .pdf): passed. Under Process Monitor with the network
-  on: 38,027 events from the app, none TCP or UDP. Network-off run not done
-  yet (the build PC is Windows Home: no Sandbox; `offline-check.wsb` is ready).
+  on: 38,027 events from the app, none TCP or UDP. With Wi-Fi off, install,
+  self-test and the window run all passed. A clean-machine run (Sandbox via
+  `offline-check.wsb`, or a VM) is still to do: the build PC is Windows Home.
 - The window run found a bug: started as a program, `gui/app.py` was loaded
   twice, so no background result reached a screen and the app stopped at
   "Working…". Fixed, with a test.

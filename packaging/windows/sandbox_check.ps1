@@ -14,10 +14,13 @@ function Note($text) { $text | Tee-Object -FilePath $result -Append | Write-Host
 Note "Offline check, $(Get-Date -Format 's'), Windows $([Environment]::OSVersion.Version)"
 $up = @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object Status -eq "Up" | ForEach-Object Name)
 Note "network adapters up: $($up.Count) $($up -join ', ')"
-$profiles = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue |
-    Where-Object { $_.IPv4Connectivity -in "LocalNetwork", "Internet" -or $_.IPv6Connectivity -in "LocalNetwork", "Internet" })
-if ($profiles.Count) { Note "WARNING: connected networks: $($profiles.InterfaceAlias -join ', '); the network is not off" }
-else { Note "connected networks: none" }
+$profiles = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue)
+$internet = @($profiles | Where-Object { $_.IPv4Connectivity -eq "Internet" -or $_.IPv6Connectivity -eq "Internet" })
+$local = @($profiles | Where-Object { $_ -notin $internet -and ($_.IPv4Connectivity -eq "LocalNetwork" -or $_.IPv6Connectivity -eq "LocalNetwork") })
+if ($internet.Count) { Note "WARNING: internet connectivity on: $($internet.InterfaceAlias -join ', '); the network is not off" }
+else { Note "internet connectivity: none" }
+# A VPN adapter (Tailscale, for example) can stay Up with no physical link under it.
+if ($local.Count) { Note "local-only networks still listed: $($local.InterfaceAlias -join ', ')" }
 
 $setup = Get-ChildItem $From -Filter "Replace-o-matic-Setup-*.exe" | Select-Object -First 1
 $p = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER" -Wait -PassThru
