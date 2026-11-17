@@ -15,6 +15,7 @@ machine, and swapped back afterwards using a local JSON vault.
 | 5 | .docx in, .docx out with formatting kept; headers, footers, footnotes, endnotes, comments | **Done** |
 | 6 | Labelled measurement on real documents; web addresses, middle names, bank names | **Done** |
 | 7 | Key document: confidential and safe placeholder tables | **Done** |
+| 8 | Altered placeholders tolerated on re-hydration; redacted PDF output | **Done** |
 
 ## Step 1: deterministic core (done)
 
@@ -372,7 +373,44 @@ Given a document (sanitized or original), only its placeholders are listed, in
 order of first appearance. With no document the whole vault is listed.
 `--format csv` or `txt`, `--confidential-only`, `--safe-only`.
 
+## Step 8: altered placeholders and redacted PDFs (done)
+
+**Altered placeholders.** Text that has been through an LLM or a Markdown
+renderer often comes back with placeholders respelled. `rehydrate` now
+restores `[person_1]`, `[Person 1]`, `[PERSON-1]`, `\[PERSON\_1\]`,
+`[ PERSON_1 ]` and the bare `PERSON_1`, and lists the altered forms it found.
+`--strict` restores exact spellings only. In `sanitizer_core`,
+`rehydrate_text(..., tolerant=True)` turns it on; the default stays exact,
+because exact matching is what the round-trip guarantee rests on.
+
+**Redacted PDFs.** With PyMuPDF installed, a PDF given to `sanitize` comes
+back as a PDF (`pdf_io.py`):
+
+- The sensitive text is deleted from the page content, not covered, and the
+  placeholder is printed where it was. The raw file no longer contains it.
+- Document metadata is cleared (the SCRUT sample named a real author there).
+- Text is read a paragraph at a time, so a name that wraps onto the next line
+  is one string. This also removes the "PDF line break inside a name" limit
+  noted in steps 4 and 6.
+- The written file is read back and must contain no vault value.
+
+Limits of PDF output:
+
+- A placeholder is usually longer than the name it replaces, so it is printed
+  in a smaller, plain font to fit the space.
+- On justified lines the words after a placeholder sit slightly further left
+  than in the original (PyMuPDF closes up part of the gap). Nothing overlaps,
+  but the right edge of that line is no longer flush.
+- Scanned pages (images of text) are not touched: they need OCR first.
+  Annotations, form fields and attachments are not examined.
+- `rehydrate` does not write PDFs: an analysis comes back as text.
+
+**Licence.** PyMuPDF is AGPL (or commercial from Artifex). It is optional
+(`requirements-pdf.txt`): without it PDFs are read with pypdf and written as
+plain text. Internal use is unaffected; distributing the tool with PyMuPDF
+bundled would bring the AGPL's terms with it.
+
 ## Later
 
-- Tolerate placeholders an LLM has altered (`[person_1]`, `PERSON 1`).
-- Redacted PDF output (today a PDF comes back as plain text).
+- Redact scanned PDFs (OCR).
+- Keep the original typeface for placeholders in PDFs.

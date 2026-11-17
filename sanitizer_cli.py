@@ -29,6 +29,7 @@ from collections import Counter
 import sanitizer_core as sc  # first project import: it sets the offline switches
 
 import docx_io
+import pdf_io
 
 PASSPHRASE_ENV = "REPLACE_O_MATIC_PASSPHRASE"
 LUCKY_WARNING = (
@@ -47,6 +48,8 @@ class Quit(Exception):
 # --------------------------------------------------------------------------
 
 def _read_pdf(path: str) -> str:
+    if pdf_io.available():
+        return pdf_io.read_pdf(path)
     from pypdf import PdfReader
 
     return "\n\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
@@ -72,12 +75,21 @@ def _is_docx(path: str) -> bool:
     return path.lower().endswith(".docx")
 
 
+def _is_pdf(path: str) -> bool:
+    return path.lower().endswith(".pdf")
+
+
 def _output_path(args, label: str) -> str:
-    """Default output: a .docx stays a .docx (formatting kept); anything else becomes .txt."""
+    """Default output: a .docx stays a .docx (formatting kept). A PDF being
+    sanitized stays a PDF when PyMuPDF is installed. Anything else becomes .txt."""
     if args.output:
         return args.output
     stem = os.path.splitext(args.input)[0]
-    return f"{stem}.{label}.docx" if _is_docx(args.input) else f"{stem}.{label}.txt"
+    if _is_docx(args.input):
+        return f"{stem}.{label}.docx"
+    if _is_pdf(args.input) and label == "sanitized" and pdf_io.available():
+        return f"{stem}.{label}.pdf"
+    return f"{stem}.{label}.txt"
 
 
 # --------------------------------------------------------------------------
@@ -269,6 +281,16 @@ def cmd_sanitize(args, ask, out, get) -> int:
         if sc.find_vault_spans(safe, vault):
             os.unlink(output)
             raise SystemExit("Internal error: a vault value survived in the .docx. No output written.")
+    elif _is_pdf(args.input) and _is_pdf(output):
+        if not pdf_io.available():
+            raise SystemExit("Writing a redacted PDF needs PyMuPDF (pip install pymupdf). Use -o file.txt for text.")
+        # The text is removed from the pages, the placeholder printed in its place,
+        # and the file's metadata cleared.
+        pdf_io.redact_pdf(args.input, output, lambda page: sc.find_vault_spans(page, vault))
+        safe = pdf_io.read_pdf(output)
+        if sc.find_vault_spans(safe, vault):
+            os.unlink(output)
+            raise SystemExit("Internal error: a vault value survived in the PDF. No output written.")
     else:
         with open(output, "w", encoding="utf-8") as fh:
             fh.write(safe)
@@ -288,16 +310,19 @@ def cmd_sanitize(args, ask, out, get) -> int:
 def cmd_rehydrate(args, ask, out, get) -> int:
     text = read_document(args.input)
     vault, _ = _open_vault(args.vault, get)
-    restored = sc.rehydrate_text(text, vault)
+    tolerant = not args.strict
+    mappings = vault["mappings"]
+    altered = Counter(
+        text[start:end] for start, end, name in sc.find_placeholders(text, vault, tolerant) if text[start:end] != name
+    )
+    restored = sc.rehydrate_text(text, vault, tolerant)
     output = _output_path(args, "rehydrated")
     if _is_docx(args.input) and _is_docx(output):
-        mappings = vault["mappings"]
 
         def edits(part: str):
             return [
-                (m.start(), m.end(), mappings[m.group(0)]["value"])
-                for m in sc.PLACEHOLDER_RE.finditer(part)
-                if m.group(0) in mappings
+                (start, end, mappings[name]["value"])
+                for start, end, name in sc.find_placeholders(part, vault, tolerant)
             ]
 
         docx_io.rewrite_docx(args.input, output, edits)
@@ -305,6 +330,8 @@ def cmd_rehydrate(args, ask, out, get) -> int:
     else:
         with open(output, "w", encoding="utf-8") as fh:
             fh.write(restored)
+    if altered:
+        out("Restored placeholders whose spelling had been altered: " + ", ".join(sorted(altered)))
     unknown = sorted(set(sc.PLACEHOLDER_RE.findall(restored)))
     out(f"Wrote {output}")
     if unknown:
@@ -438,7 +465,7 @@ def main(argv=None, ask=input, out=print, get=getpass.getpass) -> int:
     sanitize = commands.add_parser("sanitize", help="scan, review and redact a document")
     sanitize.add_argument("input")
     sanitize.add_argument("--vault", required=True, help="encrypted vault file (created if missing)")
-    sanitize.add_argument("-o", "--output", help="default: <input>.sanitized.docx for a .docx, else .sanitized.txt")
+    sanitize.add_argument("-o", "--output", help="default: same format as the input for .docx and .pdf, else .sanitized.txt")
     sanitize.add_argument(
         "--lucky", action="store_true", help="I'm feeling lucky: accept everything found, no review"
     )
@@ -449,6 +476,9 @@ def main(argv=None, ask=input, out=print, get=getpass.getpass) -> int:
     rehydrate.add_argument("input")
     rehydrate.add_argument("--vault", required=True)
     rehydrate.add_argument("-o", "--output", help="default: <input>.rehydrated.docx for a .docx, else .rehydrated.txt")
+    rehydrate.add_argument(
+        "--strict", action="store_true", help="only restore placeholders spelled exactly as written"
+    )
     rehydrate.set_defaults(run=cmd_rehydrate)
 
     vault = commands.add_parser("vault", help="summarise a vault")

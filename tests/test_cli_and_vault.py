@@ -408,3 +408,85 @@ def test_key_docx_and_txt_formats(tmp_path):
     assert not (tmp_path / "case.sanitized.key.txt").exists()
     lines = (tmp_path / "case.sanitized.key-safe.txt").read_text()
     assert "[PERSON_1_ALIAS_1]  (person)  [same person as [PERSON_1]]" in lines
+
+
+# ---------------------------------------------------------------- altered placeholders
+
+
+def test_tolerant_rehydrate_restores_altered_placeholders():
+    vault = sc.merge_vault(
+        None, sc.propose_mappings([("person", "Bob Lee"), ("person", "Lee"), ("financial_id", "123-45-6789")])[0]
+    )
+    altered = (
+        "a [person_1] b [Person 1] c \\[PERSON\\_1\\] d PERSON_1 e [PERSON-1-alias-1] "
+        "f [financial id 1] g [ FINANCIAL_ID_1 ] h [PERSON_1]'s"
+    )
+    assert sc.rehydrate_text(altered, vault, tolerant=True) == (
+        "a Bob Lee b Bob Lee c Bob Lee d Bob Lee e Lee f 123-45-6789 g 123-45-6789 h Bob Lee's"
+    )
+    # exact matching is the default, and leaves altered forms alone
+    assert sc.rehydrate_text(altered, vault) == altered[: altered.index("[PERSON_1]'s")] + "Bob Lee's"
+
+
+def test_tolerant_rehydrate_leaves_lookalikes_and_unknown_placeholders():
+    vault = sc.merge_vault(None, sc.propose_mappings([("person", "Bob Lee")])[0])
+    text = "PERSON_10, PERSON_1A, person 1, Person_1, [PERSON_2], [1], [see person 1 above], xPERSON_1"
+    assert sc.rehydrate_text(text, vault, tolerant=True) == text
+
+
+def test_cli_rehydrate_is_tolerant_by_default_and_strict_on_request(tmp_path):
+    sanitized, vault_path = make_case(tmp_path)
+    answer = tmp_path / "answer.txt"
+    answer.write_text("**[person_1]** owes \\[COMPANY\\_1\\]; [PERSON_1] agreed.")
+    code, printed = run(["rehydrate", str(answer), "--vault", vault_path])
+    assert (tmp_path / "answer.rehydrated.txt").read_text() == (
+        "**John A. Smith** owes Acme Corporation; John A. Smith agreed."
+    )
+    assert "spelling had been altered" in printed and "[person_1]" in printed
+
+    run(["rehydrate", str(answer), "--vault", vault_path, "--strict"])
+    assert (tmp_path / "answer.rehydrated.txt").read_text() == (
+        "**[person_1]** owes \\[COMPANY\\_1\\]; John A. Smith agreed."
+    )
+
+
+# ---------------------------------------------------------------- redacted PDF
+
+
+def test_pdf_in_pdf_out_removes_text_and_metadata(tmp_path):
+    pymupdf = pytest.importorskip("pymupdf")
+    import pdf_io
+
+    source = tmp_path / "case.pdf"
+    document = pymupdf.open()
+    page = document.new_page()
+    # a narrow box, so the names wrap across lines inside one paragraph
+    page.insert_textbox(
+        pymupdf.Rect(72, 72, 300, 300),
+        "Plaintiff John A. Smith sued Acme Corporation in March. Smith's SSN is 123-45-6789 and "
+        "the claim against Acme Corporation was settled by John A. Smith in full.",
+        fontsize=12,
+    )
+    document.set_metadata({"author": "John A. Smith", "title": "Complaint"})
+    document.save(source)
+
+    assert "John A. Smith sued Acme Corporation" in cli.read_document(str(source))  # wraps are joined
+    code, printed = run(["sanitize", str(source), "--vault", str(tmp_path / "v"), "--lucky"])
+    assert code == 0
+    output = tmp_path / "case.sanitized.pdf"
+
+    text = pdf_io.read_pdf(str(output))
+    raw = output.read_bytes()
+    for leak in ("Smith", "Acme", "123-45-6789"):
+        assert leak not in text and leak.encode() not in raw, leak
+    for kept in ("Plaintiff", "sued", "in March", "SSN is", "was settled by", "in full", "[PERSON_1]", "[COMPANY_1]"):
+        assert kept in " ".join(text.split()), kept
+    with pymupdf.open(output) as redacted:
+        assert not redacted.metadata.get("author") and not redacted.metadata.get("title")
+        assert len(redacted) == 1
+
+    # the key and a text copy still work from the redacted PDF
+    vault = sc.load_vault(tmp_path / "v", passphrase=PASSPHRASE)
+    assert sc.rehydrate_text(text, vault).count("John A. Smith") == 2
+    run(["sanitize", str(source), "--vault", str(tmp_path / "v"), "--lucky", "-o", str(tmp_path / "plain.txt")])
+    assert "[PERSON_1]" in (tmp_path / "plain.txt").read_text()

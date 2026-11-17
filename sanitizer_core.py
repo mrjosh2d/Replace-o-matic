@@ -1054,14 +1054,62 @@ def apply_vault(text: str, vault: dict) -> str:
     return "".join(out) + text[pos:]
 
 
-def rehydrate_text(text: str, vault: dict) -> str:
+def _loose_placeholder_re() -> re.Pattern[str]:
+    """Placeholders as an LLM or a Markdown renderer may hand them back:
+    ``[person_1]``, ``[Person 1]``, ``[PERSON-1]``, ``\\[PERSON\\_1\\]``, ``[ PERSON_1 ]``,
+    and the bare ``PERSON_1`` with the brackets dropped."""
+    sep = r"(?:\\_|[ _-])"
+    types = "|".join(sep.join(part for part in t.upper().split("_")) for t in ENTITY_TYPES)
+    bracketed = (
+        r"\\?\[\s*(?i:(?P<type>" + types + r")" + sep + r"?\s*(?P<number>\d+)"
+        r"(?:" + sep + r"?\s*alias" + sep + r"?\s*(?P<alias>\d+))?)\s*\\?\]"
+    )
+    bare = (
+        r"(?<![\w\[])(?P<btype>" + "|".join(t.upper() for t in ENTITY_TYPES) + r")_(?P<bnumber>\d+)"
+        r"(?:_ALIAS_(?P<balias>\d+))?(?![\w\]])"
+    )
+    return re.compile(bracketed + "|" + bare)
+
+
+LOOSE_PLACEHOLDER_RE = _loose_placeholder_re()
+
+
+def find_placeholders(text: str, vault: dict, tolerant: bool = False) -> list[tuple[int, int, str]]:
+    """Where the vault's placeholders occur in ``text``: (start, end, placeholder).
+
+    With ``tolerant``, altered forms are recognised too (see
+    :data:`LOOSE_PLACEHOLDER_RE`) and reported under their exact name.
+    Placeholders the vault does not know are not returned.
+    """
+    mappings = _mappings(vault)
+    found = []
+    for m in (LOOSE_PLACEHOLDER_RE if tolerant else PLACEHOLDER_RE).finditer(text):
+        if tolerant:
+            etype = re.sub(r"[^A-Za-z]+", "_", m.group("type") or m.group("btype")).upper()
+            alias = m.group("alias") or m.group("balias")
+            name = f"[{etype}_{int(m.group('number') or m.group('bnumber'))}"
+            name += f"_ALIAS_{int(alias)}]" if alias else "]"
+        else:
+            name = m.group(0)
+        if name in mappings:
+            found.append((m.start(), m.end(), name))
+    return found
+
+
+def rehydrate_text(text: str, vault: dict, tolerant: bool = False) -> str:
     """Replace placeholders with their real values. Unknown placeholders are kept.
 
     Single pass over placeholder tokens only, so restored values are never
     re-scanned and one placeholder can never match inside another.
+
+    ``tolerant`` also restores placeholders whose spelling was altered on the
+    way back (lower case, spaces, escaped or missing brackets). It is off by
+    default: exact matching is what guarantees the round trip, and tolerant
+    matching is for text that has been through an LLM or an editor.
     """
     mappings = _mappings(vault)
-    return PLACEHOLDER_RE.sub(
-        lambda m: mappings[m.group(0)]["value"] if m.group(0) in mappings else m.group(0),
-        text,
-    )
+    out, pos = [], 0
+    for start, end, placeholder in find_placeholders(text, vault, tolerant):
+        out += [text[pos:start], mappings[placeholder]["value"]]
+        pos = end
+    return "".join(out) + text[pos:]
