@@ -3,6 +3,7 @@
 Set ``SCREENSHOT_DIR`` to save a PNG of each screen as the tests pass through it.
 """
 
+import json
 import os
 import re
 import threading
@@ -461,4 +462,5 @@ def test_settings_file_holds_paths_only(qtbot, window, case):
     for name in os.listdir(home):
         content = open(os.path.join(home, name), encoding="utf-8").read()
         assert PASSPHRASE not in content and "Smith" not in content and "Acme" not in content
-    assert matter in open(os.path.join(home, "settings.json"), encoding="utf-8").read()
+    with open(os.path.join(home, "settings.json"), encoding="utf-8") as f:
+        assert matter in json.load(f)["recent_matters"]  # parsed: JSON escapes Windows backslashes
