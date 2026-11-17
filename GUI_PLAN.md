@@ -249,12 +249,43 @@ phase 2's threading and the shell part of phase 1:
   (PyInstaller does not cross-compile), wrap in an installer and a `.dmg`,
   sign and notarise, and repeat the offline check on each with the network off.
 
-**What is left is the screens**: `gui/screens/` with Start, Choose, Scanning,
-Review, Done, Restore and Key (phases 1, 3, 4), then wording and access
-(phase 5), packaging (6) and the guide (7). In the Review screen, build the
-table from `Scan.items`, use `service.occurrences` / `service.context` for the
-context pane, `service.validate_edit` and `service.make_item` for edits and
-additions, and pass `Item` objects straight to `backend.commit`.
+**The screens are built and work end to end** (`gui/screens/`, `gui/settings.py`,
+`tests/test_gui_screens.py`). Function first: they have had no visual polish.
+
+- `gui/screens/__init__.py` has `install(window)`. One module per screen:
+  `start`, `choose`, `scanning`, `review`, `done`, `restore`, `key`, plus
+  `common.py` (`FilePicker`, `MatterForm`, and `MatterScreen`, the base class
+  that opens the matter on the background thread and then calls `proceed()`).
+- A matter file that does not exist yet is a new matter: passphrase twice, a
+  length hint and `wording.NEW_MATTER_WARNING`. Once a matter is open in the
+  session, later screens do not ask for the passphrase again; *Lock* forgets
+  it and calls `Screen.forget()` on every screen (passphrase boxes, the review
+  table and context pane are emptied).
+- Errors and results are shown in a line on the screen (`screen.message`), not
+  in pop-ups. The only pop-ups are the two confirmations: unreviewed
+  (`wording.UNREVIEWED`) and the confidential key warning.
+- Review: `QTableView` on `ReviewTableModel` through `ReviewFilter` (sorting,
+  type filter, search), `TypeDelegate` for the Type column, context pane
+  stepping through every occurrence, `AddDialog` with live count and context.
+- `gui/settings.py` keeps the recent-matters list (paths only) in
+  `settings.json` beside the log. `REPLACE_O_MATIC_HOME` moves that folder;
+  the tests use it.
+- Tests drive the real widgets headless. Set `SCREENSHOT_DIR=some/folder` when
+  running `tests/test_gui_screens.py` to get a PNG of every screen.
+
+**Left for the next session (Sonnet), phase 5 onward:**
+
+- Looks: spacing, button sizes, step bar styling, a proper drop area on
+  Choose, column widths in the review table, an icon.
+- Wording pass: messages raised by `sanitizer_service` and `sanitizer_core`
+  still say "vault" ("Wrong passphrase, or the vault file is damaged.") and
+  reach the window unchanged. Give the service its own user-facing wording or
+  translate in one place; do not patch strings in screens. "(1 time(s))"
+  plurals. The model column headers live in `gui/review_model.py`.
+- Keyboard access: tab order, shortcuts, Space to tick a row, Enter on forms.
+- Not built: a firm setting that disables *Accept all*; first-run walkthrough;
+  choosing the output file name or key format (the service takes both).
+- Then packaging on Windows and macOS (6) and the guide (7).
 
 ## Phases
 

@@ -1,2 +1,4 @@
 # The desktop window (GUI_PLAN.md). Essentials only: no QtNetwork/WebEngine add-ons.
-PySide6-Essentials>=6.7
+# Not 6.12.0: on Python 3.11 every Signal.emit() there drops a reference to True,
+# and the program dies after a few hundred signals (tests/test_gui_backend.py checks).
+PySide6-Essentials>=6.7,!=6.12.0

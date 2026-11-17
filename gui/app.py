@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui import wording
+from gui import settings, wording
 from gui.workers import Backend
 
 
@@ -67,6 +67,9 @@ class Screen(QWidget):
 
     def enter(self) -> None:
         """Called every time the screen is shown."""
+
+    def forget(self) -> None:
+        """Called on Lock and on close: drop passphrases and document text held in widgets."""
 
     # Background results are routed to the screen that is showing.
     def on_finished(self, job: str, result) -> None: ...
@@ -145,6 +148,8 @@ class MainWindow(QMainWindow):
         """Forget the passphrase and everything read with it."""
         self.backend.cancel()
         self.session = Session()
+        for screen in self.screens.values():
+            screen.forget()
         if "start" in self.screens:
             self.go("start")
 
@@ -162,10 +167,7 @@ class MainWindow(QMainWindow):
 
 
 def log_path() -> str:
-    base = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".replace-o-matic")
-    folder = os.path.join(base, "Replace-o-matic") if os.environ.get("LOCALAPPDATA") else base
-    os.makedirs(folder, exist_ok=True)
-    return os.path.join(folder, "replace-o-matic.log")
+    return os.path.join(settings.app_folder(), "replace-o-matic.log")
 
 
 def self_test() -> int:
