@@ -458,3 +458,119 @@ def vault_summary(vault: dict) -> dict:
         "unreviewed": sum(1 for e in mappings.values() if e.get("reviewed") is False),
         "declined": len(vault.get("declined", [])),
     }
+
+
+# --------------------------------------------------------------------------
+# Review state: what a reviewer has decided so far (no GUI in here)
+# --------------------------------------------------------------------------
+
+SOURCE_LABELS = {"ner": "model", "regex": "pattern", "propagated": "short form", "manual": "added by you"}
+
+
+@dataclass
+class Row:
+    item: Item
+    accepted: bool = True
+    detected_value: str = ""  # what the scan proposed, before any edit; "" for added rows
+
+
+class ReviewState:
+    """The decisions behind the review table. Every row starts accepted.
+
+    ``result()`` gives what :func:`commit` needs. ``reviewed`` is False only if
+    the reviewer changed nothing and looked at nothing: the "accept all" path.
+    """
+
+    def __init__(self, scan: Scan):
+        self.scan = scan
+        self.rows = [Row(item, True, item.value) for item in scan.items]
+        self.touched = False
+
+    # ---- looking
+
+    def mark_seen(self, index: int) -> None:
+        """The reviewer opened this row's context."""
+        self.touched = True
+
+    def occurrences(self, index: int) -> list[tuple[int, int]]:
+        return occurrences(self.scan.text, self.rows[index].item.value)
+
+    # ---- deciding
+
+    def set_accepted(self, index: int, accepted: bool) -> None:
+        self.rows[index].accepted = accepted
+        self.touched = True
+
+    def accept_all(self) -> None:
+        """Tick every row. Does not count as reviewing."""
+        for row in self.rows:
+            row.accepted = True
+
+    def set_type(self, index: int, etype: str) -> str | None:
+        if etype not in sc.ENTITY_TYPES:
+            return "Choose one of the listed types."
+        self.rows[index].item.type = etype
+        self.touched = True
+        return None
+
+    def _taken(self, value: str, skip: int | None = None) -> bool:
+        in_rows = any(r.item.value == value for i, r in enumerate(self.rows) if i != skip)
+        in_matter = any(e["value"] == value for e in self.scan.vault["mappings"].values())
+        return in_rows or in_matter
+
+    def edit_text(self, index: int, new_text: str) -> str | None:
+        """Change the text a row redacts. Returns None, or why it was refused."""
+        new_text = new_text.strip()
+        problem = validate_edit(self.scan, new_text)
+        if problem:
+            return problem
+        if self._taken(new_text, skip=index):
+            return "That text is already in the list or in this matter."
+        item = self.rows[index].item
+        if new_text != item.value:
+            item.value, item.source, item.entity_hint = new_text, "manual", ""
+            item.times = len(occurrences(self.scan.text, new_text))
+            self.touched = True
+        return None
+
+    def check_add(self, etype: str, text: str) -> str | None:
+        """Why this could not be added, or None. Changes nothing."""
+        text = text.strip()
+        problem = validate_edit(self.scan, text)
+        if problem:
+            return problem
+        if etype not in sc.ENTITY_TYPES:
+            return "Choose one of the listed types."
+        if self._taken(text):
+            return "That text is already in the list or in this matter."
+        return None
+
+    def add(self, etype: str, text: str) -> str | None:
+        """Add something the scan missed. Returns None, or why it was refused."""
+        problem = self.check_add(etype, text)
+        if problem is None:
+            self.rows.append(Row(make_item(self.scan, etype, text.strip()), True, ""))
+            self.touched = True
+        return problem
+
+    # ---- outcome
+
+    @property
+    def accepted_count(self) -> int:
+        return sum(row.accepted for row in self.rows)
+
+    def result(self) -> tuple[list[Item], list[str], bool]:
+        """(accepted items, declined values, reviewed) for :func:`commit`.
+
+        A declined row is remembered under the text the scan proposed, so it is
+        not proposed again. A row the reviewer added and then unticked is simply
+        dropped.
+        """
+        accepted = [row.item for row in self.rows if row.accepted]
+        kept = {item.value for item in accepted}
+        declined = [
+            row.detected_value
+            for row in self.rows
+            if not row.accepted and row.detected_value and row.detected_value not in kept
+        ]
+        return accepted, declined, self.touched

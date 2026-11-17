@@ -222,6 +222,21 @@ phase 2's threading and the shell part of phase 1:
   with `pytest-qt`. One `strace` test runs a real scan inside the window
   process and fails on any outbound connection.
 
+**The review logic is done** (`ReviewState` in `sanitizer_service.py`,
+`gui/review_model.py`, `tests/test_review.py`):
+
+- `ReviewState(scan)` holds every decision: `set_accepted`, `set_type`,
+  `edit_text`, `check_add` / `add`, `accept_all`, `mark_seen`, `occurrences`,
+  `accepted_count`, and `result()` which returns exactly what `commit` takes.
+  Refusals come back as a sentence to show. `reviewed` is False only when
+  nothing was looked at or changed.
+- `ReviewTableModel(state)` is the Qt model for the table, with the columns in
+  the mock-up. It emits `refused(message)` and `counts_changed(accepted,
+  total)`. The Review screen needs a `QTableView` on this model (inside a
+  `QSortFilterProxyModel` for sorting, type filter and search), a combo-box
+  delegate for the Type column, the context pane, and the buttons. Call
+  `model.mark_seen(row)` when a row's context is shown.
+
 **What is left is the screens**: `gui/screens/` with Start, Choose, Scanning,
 Review, Done, Restore and Key (phases 1, 3, 4), then wording and access
 (phase 5), packaging (6) and the guide (7). In the Review screen, build the
