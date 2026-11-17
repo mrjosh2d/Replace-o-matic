@@ -212,3 +212,68 @@ A11Y_RECENT = "Recent matters"
 A11Y_PROGRESS = "Scanning progress"
 A11Y_RESIDUE = "Text to check"
 A11Y_STEP = "Step {n} of {total}: {name}"
+
+
+# ---- output file (Review and Restore)
+OUTPUT_SANITIZED = "Save the sanitized document as:"
+OUTPUT_RESTORED = "Save the restored file as:"
+CHANGE = "Chan&ge…"
+A11Y_OUTPUT_PATH = "Where the file will be saved"
+A11Y_OUTPUT_CHANGE = "Choose where to save the file"
+OUTPUT_FILTERS = {
+    ".docx": "Word document (*.docx)",
+    ".pdf": "PDF (*.pdf)",
+    ".txt": "Plain text (*.txt)",
+}
+
+# ---- key format
+KEY_FORMAT = "File type"
+KEY_FORMATS = [
+    ("docx", "Word document (.docx)"),
+    ("csv", "Spreadsheet (.csv)"),
+    ("txt", "Plain text (.txt)"),
+]
+
+# ---- first-run walkthrough
+HELP_MENU = "&Help"
+HELP_INTRO = "&How Replace-o-matic works"
+INTRO_TITLE = "How Replace-o-matic works"
+INTRO_PAGE = "{n} of {total}"
+INTRO_NEXT = "&Next"
+INTRO_FINISH = "&Finish"
+INTRO_PAGES = [
+    (
+        "What it does",
+        "Replace-o-matic swaps the names and numbers in a document for stand-ins such as "
+        "[PERSON_1], so the document can be sent for analysis. When the analysis comes back, "
+        "it puts the real names and numbers back.\n\n"
+        "Everything happens on this computer. Nothing is sent anywhere.",
+    ),
+    (
+        "The matter file and passphrase",
+        "Each client matter has its own matter file. It keeps the real names locked, so the "
+        "same name gets the same stand-in every time.\n\n"
+        "You choose a passphrase when you start a matter. If you lose it, the names cannot be "
+        "restored. Nobody can recover it, so keep it somewhere safe.",
+    ),
+    (
+        "Review the list",
+        "The scan is not perfect. In testing on new documents it missed about 1 in 10 "
+        "sensitive mentions.\n\n"
+        "Before you send anything, read the list of what was found and look through the "
+        "document. If something was missed, use \"Add something missed\".",
+    ),
+    (
+        "What to send and what to keep",
+        "Send only the sanitized document.\n\n"
+        "Never send the matter file, and never send the confidential key. Both hold the real "
+        "names. Keep them on this computer.",
+    ),
+]
+
+# ---- a file that is already there
+REPLACE_TITLE = "The file already exists"
+REPLACE_TEXT = "This file is already there:\n{existing}\n\nSave a new file beside it, or replace it?"
+REPLACE_NEW_NAMES = "The new file would be:\n{names}"
+REPLACE_SAVE_NEW = "Save as &new file"
+REPLACE_REPLACE = "&Replace it"

@@ -8,7 +8,7 @@ __pycache__/
 *.sanitized.*
 *.key.*
 *.key-safe.*
-*.rehydrated.txt
+*.rehydrated.*
 
 # Local model weights
 models/

@@ -18,7 +18,7 @@ import os
 import sys
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gui import settings, wording
+from gui import intro, settings, wording
 from gui.workers import Backend
 
 
@@ -144,6 +144,10 @@ class MainWindow(QMainWindow):
         lock.triggered.connect(self.lock)
         self.lock_action = lock
         self.menuBar().addMenu(wording.APP_NAME).addAction(lock)
+        help_action = QAction(wording.HELP_INTRO, self)
+        help_action.triggered.connect(lambda: intro.open_intro(self))
+        self.help_action = help_action
+        self.menuBar().addMenu(wording.HELP_MENU).addAction(help_action)
 
         self.backend.finished.connect(lambda job, result: self._route("on_finished", job, result))
         self.backend.failed.connect(lambda job, message: self._route("on_failed", job, message))
@@ -246,6 +250,7 @@ def main() -> int:
         window._stack.addWidget(placeholder)
     window.backend.preload_model()
     window.show()
+    QTimer.singleShot(0, lambda: intro.show_if_first_run(window))  # first run only
     return app.exec()
 
 

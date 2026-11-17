@@ -166,3 +166,43 @@ def test_restore_and_keys(case, tmp_path):
 
     summary = service.vault_summary(result.vault)
     assert summary["unreviewed"] == summary["mappings"] == len(result.vault["mappings"])
+
+
+def test_output_path_refuses_the_original_the_matter_and_wrong_formats(case, tmp_path):
+    doc, vault_path = case
+    vault = service.open_matter(vault_path, PASSPHRASE)
+    scan = service.scan_document(doc, vault)
+    items = scan.items
+    for bad in (doc, vault_path, str(tmp_path / "out.docx"), str(tmp_path / "no-such-folder" / "out.txt")):
+        with pytest.raises(service.ServiceError):
+            service.commit(scan, items, [], True, vault_path, PASSPHRASE, output_path=bad)
+    assert open(doc).read() == TEXT and not os.path.exists(vault_path)  # nothing written, original intact
+    assert sorted(os.listdir(tmp_path)) == ["case.txt"]
+
+    chosen = str(tmp_path / "for the analyst.md")  # any other extension is plain text
+    result = service.commit(scan, items, [], True, vault_path, PASSPHRASE, output_path=chosen)
+    assert result.output_path == chosen and "Smith" not in open(chosen).read()
+    with pytest.raises(service.ServiceError):
+        service.restore(chosen, result.vault, output_path=chosen)
+    restored = service.restore(chosen, result.vault, output_path=str(tmp_path / "back.txt"))
+    assert open(restored.output_path).read() == TEXT
+
+
+def test_output_formats_follow_the_input():
+    assert service.output_formats("a.docx", "sanitized") == [".docx", ".txt"]
+    assert service.output_formats("a.txt", "sanitized") == [".txt"]
+    assert service.output_formats("a.pdf", "rehydrated") == [".txt"]
+    assert service.check_output_path("a.docx", "b.docx", "sanitized") is None
+    assert "cannot be written" in service.check_output_path("a.txt", "b.pdf", "sanitized")
+
+
+def test_successor_path_keeps_the_label_so_gitignore_still_matches(tmp_path):
+    out = tmp_path / "case.sanitized.docx"
+    assert service.successor_path(str(out)) == str(tmp_path / "case (2).sanitized.docx")
+    out.write_text("x")
+    (tmp_path / "case (2).sanitized.docx").write_text("x")
+    assert service.successor_path(str(out)) == str(tmp_path / "case (3).sanitized.docx")
+    assert service.successor_path(str(tmp_path / "m.key-safe.csv")) == str(tmp_path / "m (2).key-safe.csv")
+    assert service.successor_path(str(tmp_path / "notes.md")) == str(tmp_path / "notes (2).md")
+    assert service.key_paths(None, str(tmp_path / "m.vault"), "txt") == (
+        str(tmp_path / "m.key.txt"), str(tmp_path / "m.key-safe.txt"))

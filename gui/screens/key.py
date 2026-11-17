@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtWidgets import QCheckBox, QFormLayout, QLabel, QMessageBox
+import sanitizer_service as service
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLabel, QMessageBox
 
-from gui import wording
-from gui.screens.common import FilePicker, MatterScreen, heading, page, tab_chain
+from gui import settings, wording
+from gui.screens.common import FilePicker, MatterScreen, confirm_outputs, heading, page, tab_chain
 
 
 class KeyScreen(MatterScreen):
@@ -19,6 +20,10 @@ class KeyScreen(MatterScreen):
         self.document.submitted.connect(self.start)
         self.confidential = QCheckBox(wording.KEY_CONFIDENTIAL)
         self.safe = QCheckBox(wording.KEY_SAFE)
+        self.format = QComboBox()
+        self.format.setAccessibleName(wording.KEY_FORMAT)
+        for fmt, text in wording.KEY_FORMATS:
+            self.format.addItem(text, fmt)
         self.go_button.setText(wording.KEY_MAKE)
         form = QFormLayout()
         form.addRow(wording.KEY_DOCUMENT, self.document)
@@ -29,10 +34,13 @@ class KeyScreen(MatterScreen):
         layout.addWidget(self.form)
         layout.addWidget(self.confidential)
         layout.addWidget(self.safe)
+        form_type = QFormLayout()
+        form_type.addRow(wording.KEY_FORMAT, self.format)
+        layout.addLayout(form_type)
         layout.addWidget(self.message)
         layout.addStretch(1)
         layout.addLayout(self.buttons())
-        tab_chain(self.document.edit, self.document.button, *self.form.tab_widgets(), self.confidential, self.safe,
+        tab_chain(self.document.edit, self.document.button, *self.form.tab_widgets(), self.confidential, self.safe, self.format,
                   self.back_button, self.go_button)  # fmt: skip
 
     def enter(self) -> None:
@@ -40,6 +48,7 @@ class KeyScreen(MatterScreen):
         self.document.set_path(self.session.document_path)
         self.confidential.setChecked(True)
         self.safe.setChecked(False)
+        self.format.setCurrentIndex(max(0, self.format.findData(settings.key_format())))
         self.message.setText("")
 
     def check(self) -> str | None:
@@ -57,6 +66,15 @@ class KeyScreen(MatterScreen):
                 self.set_busy(False)
                 self.message.setText("")
                 return
+        fmt = self.format.currentData()
+        settings.set_key_format(fmt)
+        defaults = service.key_paths(self.document.path() or None, self.session.matter_path, fmt)
+        wanted = [path if box.isChecked() else None for path, box in zip(defaults, (self.confidential, self.safe))]
+        chosen = confirm_outputs(self, wanted)
+        if chosen is None:
+            self.set_busy(False)
+            self.message.setText("")
+            return
         self.set_busy(True)
         self.backend.write_keys(
             self.session.vault,
@@ -64,6 +82,9 @@ class KeyScreen(MatterScreen):
             self.session.matter_path,
             confidential=self.confidential.isChecked(),
             safe=self.safe.isChecked(),
+            fmt=fmt,
+            confidential_path=chosen[0],
+            safe_path=chosen[1],
         )
 
     def on_finished(self, job: str, result) -> None:

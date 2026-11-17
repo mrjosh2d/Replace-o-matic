@@ -126,6 +126,57 @@ def default_output_path(input_path: str, label: str) -> str:
     return f"{stem}.{label}.txt"
 
 
+
+def output_formats(input_path: str, label: str) -> list[str]:
+    """The extensions an output can have for this input, the default first.
+    Any other extension except .docx and .pdf is written as plain text."""
+    if is_docx(input_path):
+        return [".docx", ".txt"]
+    if is_pdf(input_path) and label == "sanitized" and pdf_io.available():
+        return [".pdf", ".txt"]
+    return [".txt"]
+
+
+_OUTPUT_LABELS = (".key-safe", ".sanitized", ".rehydrated", ".key")  # longest match first
+
+
+def successor_path(path: str) -> str:
+    """The first free name beside ``path`` with a number added: ``case.sanitized.docx``
+    becomes ``case (2).sanitized.docx``, so the label (and .gitignore) still match."""
+    stem, extension = os.path.splitext(path)
+    label = next((lab for lab in _OUTPUT_LABELS if stem.endswith(lab)), "")
+    stem = stem[: len(stem) - len(label)]
+    number = 2
+    while os.path.exists(candidate := f"{stem} ({number}){label}{extension}"):
+        number += 1
+    return candidate
+
+
+def key_paths(document_path: str | None, vault_path: str, fmt: str = "docx") -> tuple[str, str]:
+    """The default confidential and safe key paths."""
+    stem = os.path.splitext(document_path or vault_path)[0]
+    return f"{stem}.key.{fmt}", f"{stem}.key-safe.{fmt}"
+
+def _same_file(a: str, b: str) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def check_output_path(input_path: str, output_path: str, label: str, vault_path: str | None = None) -> str | None:
+    """None if ``output_path`` is a safe place to write, else the reason it is not."""
+    extension = os.path.splitext(output_path)[1].lower()
+    if extension in (".docx", ".pdf") and extension not in output_formats(input_path, label):
+        return f"A {extension} file cannot be written from this document. Use {' or '.join(output_formats(input_path, label))}."
+    if _same_file(output_path, input_path):
+        return "The output would replace the original document. Choose another name."
+    if vault_path and _same_file(output_path, vault_path):
+        return "The output would replace the vault file. Choose another name."
+    if not os.path.isdir(os.path.dirname(os.path.abspath(output_path))):
+        return f"The folder for {output_path} does not exist."
+    return None
+
 # --------------------------------------------------------------------------
 # Matters (vaults)
 # --------------------------------------------------------------------------
@@ -268,6 +319,9 @@ def commit(
         raise ServiceError("Internal error: round-trip check failed. No output written.")
 
     output = output_path or default_output_path(scan.path, "sanitized")
+    problem = check_output_path(scan.path, output, "sanitized", vault_path)
+    if problem:
+        raise ServiceError(problem + " No output written.")
     directory = os.path.dirname(os.path.abspath(output))
     fd, pending = tempfile.mkstemp(dir=directory, prefix=".pending-", suffix=os.path.splitext(output)[1])
     os.close(fd)
@@ -323,6 +377,9 @@ def restore(path: str, vault: dict, output_path: str | None = None, tolerant: bo
     altered = sorted({text[start:end] for start, end, name in found if text[start:end] != name})
     restored = sc.rehydrate_text(text, vault, tolerant)
     output = output_path or default_output_path(path, "rehydrated")
+    problem = check_output_path(path, output, "rehydrated")
+    if problem:
+        raise ServiceError(problem + " Nothing was written.")
     if is_docx(path) and is_docx(output):
 
         def edits(part: str):
@@ -434,16 +491,16 @@ def write_keys(
     the placeholders that appear in it are listed."""
     text = read_document(document_path) if document_path else None
     about = f" for {os.path.basename(document_path)}" if document_path else ""
-    stem = os.path.splitext(document_path or vault_path)[0]
+    default_confidential, default_safe = key_paths(document_path, vault_path, fmt)
     count = 0
     written: list[str | None] = [None, None]
     if confidential:
-        written[0] = confidential_path or f"{stem}.key.{fmt}"
+        written[0] = confidential_path or default_confidential
         header, rows = build_key(vault, text, values=True)
         write_key(written[0], "Key" + about, CONFIDENTIAL_NOTE, header, rows, private=True)
         count = len(rows)
     if safe:
-        written[1] = safe_path or f"{stem}.key-safe.{fmt}"
+        written[1] = safe_path or default_safe
         header, rows = build_key(vault, text, values=False)
         write_key(written[1], "Key (no real values)" + about, SAFE_NOTE, header, rows, private=False)
         count = len(rows)
