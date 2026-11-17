@@ -269,4 +269,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Run as a program (python -m gui.app, or the packaged app), this file is the
+    # module __main__, while the screens import gui.app: two copies, two Screen
+    # classes, and MainWindow.current() would match no screen, so background
+    # results would never reach one. Run the gui.app copy instead.
+    from gui.app import main as _main
+
+    sys.exit(_main())
