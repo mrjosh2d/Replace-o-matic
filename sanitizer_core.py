@@ -267,6 +267,9 @@ class ModelNotFoundError(RuntimeError):
 class GlinerDetector:
     """NER detector backed by a local GLiNER ONNX model.
 
+    The model is run by ``onnx_gliner.OnnxGliner`` (no PyTorch). Set
+    ``SANITIZER_BACKEND=gliner`` to run it through the ``gliner`` package.
+
     GLiNER only reads a few hundred words at a time and silently ignores the
     rest, so the text is fed in overlapping windows and the spans are mapped
     back to document offsets.
@@ -310,15 +313,21 @@ class GlinerDetector:
                 "Import sanitizer_core first, or set ORT_DISABLE_TELEMETRY=1 in the environment."
             )
         os.environ.update(_OFFLINE_ENV)
-        from gliner import GLiNER
+        if os.environ.get("SANITIZER_BACKEND", "onnx") == "gliner":
+            # The reference implementation; needs PyTorch and transformers.
+            from gliner import GLiNER
 
-        return GLiNER.from_pretrained(
-            model_dir,
-            local_files_only=True,
-            load_onnx_model=True,
-            load_tokenizer=True,
-            onnx_model_file=onnx_file,
-        )
+            return GLiNER.from_pretrained(
+                model_dir,
+                local_files_only=True,
+                load_onnx_model=True,
+                load_tokenizer=True,
+                onnx_model_file=onnx_file,
+            )
+        # Default: onnxruntime and tokenizers only (see onnx_gliner.py).
+        from onnx_gliner import OnnxGliner
+
+        return OnnxGliner(model_dir, onnx_file)
 
     def _windows(self, text: str) -> list[tuple[int, int]]:
         """Character ranges of at most ``window_words`` words each.

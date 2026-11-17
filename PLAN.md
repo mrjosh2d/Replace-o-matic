@@ -420,13 +420,17 @@ bundled would bring the AGPL's terms with it.
 Decided by the owner: PyMuPDF's AGPL licence is acceptable for now. Revisit it
 before the tool is distributed to anyone outside the firm.
 
+**Done since step 8:** the workflow now lives in `sanitizer_service.py` (phase 0
+of the window plan), and the model runs without PyTorch (`onnx_gliner.py`):
+a clean install is about 320 MB plus the 611 MB model, down from 5.5 GB.
+
 **Next: a desktop window in place of the terminal.** The plan is in
 `GUI_PLAN.md` (PySide6, Windows and macOS, for non-technical staff).
 
 Other candidates, not yet prioritised:
 
 - **Setup for a normal computer:** a one-step installer and a plain-language
-  user guide. Today the tool needs Python, a 5 GB install and a terminal.
+  user guide. Today the tool needs Python and a terminal.
 - **A simple window** in place of the terminal: pick a file, review the items,
   save. The review logic is already separate from the prompt.
 - **Batch mode:** sanitize a whole folder against one matter's vault.
@@ -436,4 +440,3 @@ Other candidates, not yet prioritised:
   planning and one LLC agreement.
 - **Keychain** in place of the typed passphrase (the seam exists).
 - **Original typeface** for placeholders in PDFs.
-- **A smaller install:** drive the ONNX model without PyTorch.

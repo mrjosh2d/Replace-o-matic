@@ -1,3 +1,4 @@
 -r requirements.txt
 -r requirements-pdf.txt
+-r requirements-fetch.txt
 pytest>=8

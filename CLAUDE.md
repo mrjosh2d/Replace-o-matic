@@ -22,8 +22,10 @@ design decisions and known limits. Update its status table when a step lands.
 ## Working here
 
 - Files: `sanitizer_core.py` (detection, vault, apply/rehydrate), `docx_io.py`
-  (.docx parts), `pdf_io.py` (PDF reading and redaction; needs the optional,
-  AGPL-licensed PyMuPDF), `sanitizer_cli.py` (review and commands).
+  (.docx parts), `onnx_gliner.py` (model runner), `sanitizer_service.py` (the
+  workflow; no terminal, no GUI), `pdf_io.py` (PDF reading and redaction; needs the optional,
+  AGPL-licensed PyMuPDF), `sanitizer_cli.py` (terminal front end, thin). The desktop window is planned in
+  `GUI_PLAN.md`; all behaviour belongs in the service, not in a front end.
 - Python 3.11. Setup and tests:
   ```
   uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt
@@ -34,8 +36,10 @@ design decisions and known limits. Update its status table when a step lands.
 - After any change to detection, run `.venv/bin/python scripts/evaluate.py -v` and
   `-f holdout.json -v` and compare with the table in `PLAN.md`. Both sets have
   been tuned against; treat their scores as regression checks, not accuracy.
-- NER backend: the `gliner` package on its ONNX backend (decided; it brings
-  PyTorch as a dependency, which is accepted).
+- NER backend: `onnx_gliner.py` runs the GLiNER ONNX model with `onnxruntime`
+  and `tokenizers` only. No PyTorch at runtime (install is about 320 MB plus the
+  611 MB model). The `gliner` package is optional (`requirements-gliner.txt`);
+  a test checks both give identical results. Re-run it if the model changes.
 
 ## Delegation and model choice
 
