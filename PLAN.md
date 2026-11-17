@@ -420,7 +420,10 @@ bundled would bring the AGPL's terms with it.
 Decided by the owner: PyMuPDF's AGPL licence is acceptable for now. Revisit it
 before the tool is distributed to anyone outside the firm.
 
-Candidates for future work, not yet prioritised:
+**Next: a desktop window in place of the terminal.** The plan is in
+`GUI_PLAN.md` (PySide6, Windows and macOS, for non-technical staff).
+
+Other candidates, not yet prioritised:
 
 - **Setup for a normal computer:** a one-step installer and a plain-language
   user guide. Today the tool needs Python, a 5 GB install and a terminal.
