@@ -71,9 +71,20 @@ across the top shows where they are. Nothing is written until the last step.
 
 ### Restore and key
 
-- **Restore an analysis:** choose the file that came back (.docx or .txt),
-  choose the matter, passphrase. Shows how many placeholders were restored,
-  which altered spellings were recognised, and which placeholders were unknown.
+- **Restore an analysis:** give it what came back, choose the matter,
+  passphrase. Shows how many placeholders were restored, which altered
+  spellings were recognised, and which placeholders were unknown. Three ways
+  in (requested by the owner):
+  - **Choose a file** (.docx or .txt) with a file picker.
+  - **Drag and drop** a file onto the screen. Same path as choosing it.
+  - **Paste text** into a box, for an answer copied straight out of a chat
+    window. The restored text is shown in the window with *Copy* and
+    *Save as...* buttons. Nothing is written to disk unless the user saves,
+    because the result holds the real names.
+  Pasting needs a text-in call in the service: `restore_text(text, vault,
+  tolerant=True) -> (restored, RestoreResult)`, sharing the counting with
+  `restore()` so the file and paste paths report the same way. Run it through
+  `Backend` like the others.
 - **Key:** from the Done screen or the Start screen. Two tick boxes,
   *Confidential key* (ticked) and *Safe key*. The confidential key gets a
   warning before it is written.
