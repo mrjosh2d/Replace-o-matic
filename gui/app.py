@@ -230,8 +230,22 @@ def self_test() -> int:
     return 0 if ok and not loaded else 1
 
 
+def _attach_console() -> None:
+    """The Windows build is a windowed program (console=False), so it starts
+    with no stdout. Borrow the console it was started from, if any, so that
+    ``--self-test`` prints there. Redirected output (``> file``) already works."""
+    if os.name != "nt" or sys.stdout is not None:
+        return
+    import ctypes
+
+    if ctypes.windll.kernel32.AttachConsole(-1):  # ATTACH_PARENT_PROCESS
+        sys.stdout = open("CONOUT$", "w", encoding="utf-8", errors="replace")
+        sys.stderr = sys.stdout
+
+
 def main() -> int:
     if "--self-test" in sys.argv:
+        _attach_console()
         return self_test()
     # The log records events and error types only: never document text, values or passphrases.
     logging.basicConfig(filename=log_path(), level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
