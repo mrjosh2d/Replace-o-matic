@@ -203,6 +203,19 @@ def test_no_qt_network_modules_are_loaded():
     assert isinstance(QThread.currentThread(), QThread)
 
 
+def test_emitting_signals_does_not_corrupt_reference_counts(qtbot):
+    """PySide6 6.12.0 on Python 3.11 lost a reference to True on every emit and
+    crashed after a few hundred: a long scan emits that many progress signals."""
+    import sys
+
+    backend = Backend()
+    before = sys.getrefcount(True)
+    for _ in range(200):
+        backend.progress.emit(1, 2)
+    assert abs(sys.getrefcount(True) - before) < 50
+    assert backend.shutdown()
+
+
 @pytest.mark.model
 def test_window_scan_opens_no_network_connection_at_os_level(tmp_path):
     """The whole window process, Qt included, traced with strace during a real scan."""

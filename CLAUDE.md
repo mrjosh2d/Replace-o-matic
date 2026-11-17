@@ -24,8 +24,8 @@ design decisions and known limits. Update its status table when a step lands.
 - Files: `sanitizer_core.py` (detection, vault, apply/rehydrate), `docx_io.py`
   (.docx parts), `onnx_gliner.py` (model runner), `sanitizer_service.py` (the
   workflow; no terminal, no GUI), `pdf_io.py` (PDF reading and redaction; needs the optional,
-  AGPL-licensed PyMuPDF), `sanitizer_cli.py` (terminal front end, thin), `gui/` (desktop window: frame and
-  background thread built, screens still to do; see `GUI_PLAN.md`). All behaviour
+  AGPL-licensed PyMuPDF), `sanitizer_cli.py` (terminal front end, thin), `gui/` (desktop window: frame, background thread and
+  all screens in `gui/screens/` built, unpolished; see the Status section of `GUI_PLAN.md`). All behaviour
   belongs in the service, not in a front end.
 - In `gui/`, never import QtNetwork, QtWebEngine or QtWebSockets, and never do
   slow work on the window's thread: go through `gui.workers.Backend`.
@@ -34,7 +34,7 @@ design decisions and known limits. Update its status table when a step lands.
   uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt
   .venv/bin/python -m pytest
   ```
-- Window tests (`tests/test_gui_backend.py`) run headless and need Qt's system
+- Window tests (`tests/test_gui_backend.py`, `tests/test_gui_screens.py`) run headless and need Qt's system
   libraries on Linux: `apt-get install -y libegl1 libgl1 libxkbcommon0
   libfontconfig1 libdbus-1-3`. They skip if PySide6 is not installed.
 - Unit tests use a stub NER and need no model. Tests that load the real GLiNER
