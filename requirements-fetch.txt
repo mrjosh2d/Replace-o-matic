@@ -1,0 +1,2 @@
+# One-time model download (scripts/fetch_model.py). Not needed at runtime.
+huggingface_hub>=0.21

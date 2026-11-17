@@ -22,20 +22,30 @@ design decisions and known limits. Update its status table when a step lands.
 ## Working here
 
 - Files: `sanitizer_core.py` (detection, vault, apply/rehydrate), `docx_io.py`
-  (.docx parts), `pdf_io.py` (PDF reading and redaction; needs the optional,
-  AGPL-licensed PyMuPDF), `sanitizer_cli.py` (review and commands).
+  (.docx parts), `onnx_gliner.py` (model runner), `sanitizer_service.py` (the
+  workflow; no terminal, no GUI), `pdf_io.py` (PDF reading and redaction; needs the optional,
+  AGPL-licensed PyMuPDF), `sanitizer_cli.py` (terminal front end, thin), `gui/` (desktop window: frame and
+  background thread built, screens still to do; see `GUI_PLAN.md`). All behaviour
+  belongs in the service, not in a front end.
+- In `gui/`, never import QtNetwork, QtWebEngine or QtWebSockets, and never do
+  slow work on the window's thread: go through `gui.workers.Backend`.
 - Python 3.11. Setup and tests:
   ```
   uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt
   .venv/bin/python -m pytest
   ```
+- Window tests (`tests/test_gui_backend.py`) run headless and need Qt's system
+  libraries on Linux: `apt-get install -y libegl1 libgl1 libxkbcommon0
+  libfontconfig1 libdbus-1-3`. They skip if PySide6 is not installed.
 - Unit tests use a stub NER and need no model. Tests that load the real GLiNER
   model are marked `model` and skip when the model is absent.
 - After any change to detection, run `.venv/bin/python scripts/evaluate.py -v` and
   `-f holdout.json -v` and compare with the table in `PLAN.md`. Both sets have
   been tuned against; treat their scores as regression checks, not accuracy.
-- NER backend: the `gliner` package on its ONNX backend (decided; it brings
-  PyTorch as a dependency, which is accepted).
+- NER backend: `onnx_gliner.py` runs the GLiNER ONNX model with `onnxruntime`
+  and `tokenizers` only. No PyTorch at runtime (install is about 320 MB plus the
+  611 MB model). The `gliner` package is optional (`requirements-gliner.txt`);
+  a test checks both give identical results. Re-run it if the model changes.
 
 ## Delegation and model choice
 

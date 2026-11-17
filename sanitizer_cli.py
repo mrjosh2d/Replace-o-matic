@@ -28,8 +28,8 @@ from collections import Counter
 
 import sanitizer_core as sc  # first project import: it sets the offline switches
 
-import docx_io
-import pdf_io
+import sanitizer_service as service
+from sanitizer_service import build_key, find_residue, write_key  # noqa: F401  (used by tests and scripts)
 
 PASSPHRASE_ENV = "REPLACE_O_MATIC_PASSPHRASE"
 LUCKY_WARNING = (
@@ -43,74 +43,29 @@ class Quit(Exception):
     """The reviewer chose to stop. Nothing is saved."""
 
 
-# --------------------------------------------------------------------------
-# Reading documents
-# --------------------------------------------------------------------------
-
-def _read_pdf(path: str) -> str:
-    if pdf_io.available():
-        return pdf_io.read_pdf(path)
-    from pypdf import PdfReader
-
-    return "\n\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+def _guard(function, *args, **kwargs):
+    """Run a service call; a failure the user can act on ends the program with its message."""
+    try:
+        return function(*args, **kwargs)
+    except service.ServiceError as error:
+        raise SystemExit(str(error)) from None
 
 
 def read_document(path: str) -> str:
-    """Text of a .txt, .docx or .pdf file. For a .docx that is the body, headers,
-    footers, footnotes, endnotes and comments. A scanned PDF has no text to extract."""
-    extension = os.path.splitext(path)[1].lower()
-    if extension == ".docx":
-        text = docx_io.read_docx(path)
-    elif extension == ".pdf":
-        text = _read_pdf(path)
-    else:
-        with open(path, encoding="utf-8") as fh:
-            text = fh.read()
-    if not text.strip():
-        raise SystemExit(f"No text found in {path}. If it is a scanned PDF, it needs OCR first.")
-    return text
-
-
-def _is_docx(path: str) -> bool:
-    return path.lower().endswith(".docx")
-
-
-def _is_pdf(path: str) -> bool:
-    return path.lower().endswith(".pdf")
-
-
-def _output_path(args, label: str) -> str:
-    """Default output: a .docx stays a .docx (formatting kept). A PDF being
-    sanitized stays a PDF when PyMuPDF is installed. Anything else becomes .txt."""
-    if args.output:
-        return args.output
-    stem = os.path.splitext(args.input)[0]
-    if _is_docx(args.input):
-        return f"{stem}.{label}.docx"
-    if _is_pdf(args.input) and label == "sanitized" and pdf_io.available():
-        return f"{stem}.{label}.pdf"
-    return f"{stem}.{label}.txt"
+    return _guard(service.read_document, path)
 
 
 # --------------------------------------------------------------------------
-# Review
+# Review at the terminal
 # --------------------------------------------------------------------------
 
 
-def _occurrences(text: str, value: str) -> list[re.Match]:
-    left = r"(?<!\w)" if re.match(r"\w", value[0]) else ""
-    right = r"(?!\w)" if re.match(r"\w", value[-1]) else ""
-    return list(re.finditer(left + re.escape(value) + right, text))
+def _occurrences(text: str, value: str) -> list:
+    return service.occurrences(text, value)
 
 
-def _context(text: str, value: str, width: int = 45) -> str:
-    found = _occurrences(text, value)
-    if not found:
-        return "(not found as a whole word in this document)"
-    m = found[0]
-    before = text[max(0, m.start() - width) : m.start()]
-    after = text[m.end() : m.end() + width]
-    return " ".join(f"...{before}«{value}»{after}...".split())
+def _context(text: str, value: str) -> str:
+    return service.first_context(text, value)
 
 
 def _ask_type(ask, out, default: str) -> str:
@@ -196,20 +151,6 @@ def review(text: str, proposed: dict, ask=input, out=print) -> tuple[list[tuple]
     return accepted, declined, True
 
 
-def find_residue(safe_text: str, vault: dict) -> list[tuple[str, int]]:
-    """Vault values that still show up in redacted text in a different letter
-    case ("ACME" when the vault knows "Acme"). Exact matches cannot survive
-    apply_vault, so anything listed here is a near miss worth a look."""
-    residue = []
-    for value in sorted({e["value"] for e in vault["mappings"].values()}):
-        if len(value) < 4:
-            continue
-        hits = len(re.findall(r"(?<!\w)" + re.escape(value) + r"(?!\w)", safe_text, re.IGNORECASE))
-        if hits:
-            residue.append((value, hits))
-    return residue
-
-
 # --------------------------------------------------------------------------
 # Commands
 # --------------------------------------------------------------------------
@@ -232,15 +173,10 @@ def _passphrase(path: str, new: bool, get) -> str:
 
 
 def _open_vault(path: str, get) -> tuple[dict, str]:
-    if not os.path.exists(path):
-        return sc.new_vault(), _passphrase(path, True, get)
-    if not sc.is_encrypted_vault(path):
+    if service.matter_exists(path) and not sc.is_encrypted_vault(path):
         raise SystemExit(f"{path} is not an encrypted vault. Refusing to use it.")
-    passphrase = _passphrase(path, False, get)
-    try:
-        return sc.load_vault(path, passphrase=passphrase), passphrase
-    except sc.VaultError as error:
-        raise SystemExit(str(error))
+    passphrase = _passphrase(path, not service.matter_exists(path), get)
+    return _guard(service.open_matter, path, passphrase), passphrase
 
 
 def cmd_sanitize(args, ask, out, get) -> int:
@@ -248,59 +184,28 @@ def cmd_sanitize(args, ask, out, get) -> int:
     vault, passphrase = _open_vault(args.vault, get)
 
     out(f"Scanning {args.input} ({len(text.split()):,} words)...")
-    proposal = sc.scan_text(text, vault, ner=False if args.regex_only else None)
-    for warning in proposal["warnings"]:
+    scan = _guard(service.scan_document, args.input, vault, regex_only=args.regex_only)
+    for warning in scan.warnings:
         out("Warning: " + warning)
-    out(f"{len(proposal['matched'])} item(s) in this document are already in the vault.")
+    out(f"{scan.already_known} item(s) in this document are already in the vault.")
 
     if args.lucky:
-        accepted = [(e["type"], e["value"], e["source"]) for e in proposal["proposed"].values()]
-        declined, reviewed = [], False
+        accepted, declined, reviewed = list(scan.items), [], False
         out(f"I'm feeling lucky: accepting all {len(accepted)} new item(s) without review.")
     else:
+        proposed = {i: {"type": item.type, "value": item.value, "source": item.source} for i, item in enumerate(scan.items)}
         try:
-            accepted, declined, reviewed = review(text, proposal["proposed"], ask, out)
+            accepted, declined, reviewed = review(scan.text, proposed, ask, out)
         except Quit:
             out("Stopped. Nothing was saved and no output was written.")
             return 1
 
-    new_mappings, _ = sc.propose_mappings(accepted, vault)
-    for entry in new_mappings.values():
-        entry["reviewed"] = reviewed
-    vault = sc.merge_vault(vault, new_mappings, declined)
-    sc.save_vault(vault, args.vault, passphrase=passphrase)
-
-    safe = sc.apply_vault(text, vault)
-    if sc.rehydrate_text(safe, vault) != text:
-        raise SystemExit("Internal error: round-trip check failed. No output written.")
-    output = _output_path(args, "sanitized")
-    if _is_docx(args.input) and _is_docx(output):
-        # Same file, same formatting; only the sensitive text and author metadata change.
-        docx_io.rewrite_docx(args.input, output, lambda part: sc.find_vault_spans(part, vault), scrub=True)
-        safe = docx_io.read_docx(output)
-        if sc.find_vault_spans(safe, vault):
-            os.unlink(output)
-            raise SystemExit("Internal error: a vault value survived in the .docx. No output written.")
-    elif _is_pdf(args.input) and _is_pdf(output):
-        if not pdf_io.available():
-            raise SystemExit("Writing a redacted PDF needs PyMuPDF (pip install pymupdf). Use -o file.txt for text.")
-        # The text is removed from the pages, the placeholder printed in its place,
-        # and the file's metadata cleared.
-        pdf_io.redact_pdf(args.input, output, lambda page: sc.find_vault_spans(page, vault))
-        safe = pdf_io.read_pdf(output)
-        if sc.find_vault_spans(safe, vault):
-            os.unlink(output)
-            raise SystemExit("Internal error: a vault value survived in the PDF. No output written.")
-    else:
-        with open(output, "w", encoding="utf-8") as fh:
-            fh.write(safe)
-
-    out(f"\nAdded {len(new_mappings)} item(s) to the vault, declined {len(declined)}.")
-    out(f"Replaced {len(sc.find_vault_spans(text, vault))} occurrence(s). Wrote {output}")
-    residue = find_residue(safe, vault)
-    if residue:
+    result = _guard(service.commit, scan, accepted, declined, reviewed, args.vault, passphrase, args.output)
+    out(f"\nAdded {result.added} item(s) to the vault, declined {result.declined}.")
+    out(f"Replaced {result.replaced} occurrence(s). Wrote {result.output_path}")
+    if result.residue:
         out("Check these: vault values that still appear in a different letter case:")
-        for value, hits in residue:
+        for value, hits in result.residue:
             out(f"  \"{value}\" x{hits}")
     if not reviewed:
         out("\n" + LUCKY_WARNING)
@@ -308,34 +213,14 @@ def cmd_sanitize(args, ask, out, get) -> int:
 
 
 def cmd_rehydrate(args, ask, out, get) -> int:
-    text = read_document(args.input)
+    read_document(args.input)  # fail early, before asking for a passphrase
     vault, _ = _open_vault(args.vault, get)
-    tolerant = not args.strict
-    mappings = vault["mappings"]
-    altered = Counter(
-        text[start:end] for start, end, name in sc.find_placeholders(text, vault, tolerant) if text[start:end] != name
-    )
-    restored = sc.rehydrate_text(text, vault, tolerant)
-    output = _output_path(args, "rehydrated")
-    if _is_docx(args.input) and _is_docx(output):
-
-        def edits(part: str):
-            return [
-                (start, end, mappings[name]["value"])
-                for start, end, name in sc.find_placeholders(part, vault, tolerant)
-            ]
-
-        docx_io.rewrite_docx(args.input, output, edits)
-        restored = docx_io.read_docx(output)
-    else:
-        with open(output, "w", encoding="utf-8") as fh:
-            fh.write(restored)
-    if altered:
-        out("Restored placeholders whose spelling had been altered: " + ", ".join(sorted(altered)))
-    unknown = sorted(set(sc.PLACEHOLDER_RE.findall(restored)))
-    out(f"Wrote {output}")
-    if unknown:
-        out("Placeholders not in this vault were left as they are: " + ", ".join(unknown))
+    result = _guard(service.restore, args.input, vault, args.output, tolerant=not args.strict)
+    if result.altered:
+        out("Restored placeholders whose spelling had been altered: " + ", ".join(result.altered))
+    out(f"Wrote {result.output_path}")
+    if result.unknown:
+        out("Placeholders not in this vault were left as they are: " + ", ".join(result.unknown))
     return 0
 
 
@@ -355,106 +240,20 @@ def cmd_vault(args, ask, out, get) -> int:
     return 0
 
 
-CONFIDENTIAL_NOTE = (
-    "CONFIDENTIAL. This key contains the real names and numbers. Keep it on this machine; "
-    "never send it with the sanitized document."
-)
-SAFE_NOTE = (
-    "Safe key: no real values. It only shows which placeholders refer to the same person, "
-    "company or item, and may accompany the sanitized document."
-)
-
-
-def build_key(vault: dict, text: str | None = None, values: bool = True) -> tuple[list[str], list[list]]:
-    """Table for a key document: one row per placeholder, aliases under their entity.
-
-    With ``text`` (a sanitized document, or the original), only placeholders
-    that occur in it are listed, in order of first appearance, with a count.
-    """
-    mappings = vault["mappings"]
-    counts: Counter = Counter()
-    first: dict[str, int] = {}
-    if text is not None:
-        found = [(m.start(), m.group(0)) for m in sc.PLACEHOLDER_RE.finditer(text) if m.group(0) in mappings]
-        if not found:  # an original document: work out what would be replaced
-            found = [(start, placeholder) for start, _, placeholder in sc.find_vault_spans(text, vault)]
-        for position, placeholder in found:
-            counts[placeholder] += 1
-            first.setdefault(placeholder, position)
-
-    entities: dict[str, list[str]] = {}
-    for placeholder, entry in mappings.items():
-        if text is None or placeholder in counts:
-            entities.setdefault(entry["entity"], []).append(placeholder)
-    order = sorted(entities, key=lambda e: min(first.get(p, 0) for p in entities[e])) if text is not None else list(entities)
-
-    header = ["Placeholder", "Type"] + (["Real value"] if values else []) + ["Same as"]
-    header += ["Times in document"] if text is not None else []
-    rows = []
-    for entity in order:
-        main = f"[{entity}]"
-        members = sorted(entities[entity], key=lambda p: p != main)  # stable: vault order otherwise
-        for placeholder in members:
-            entry = mappings[placeholder]
-            row = [placeholder, entry["type"].replace("_", " ")]
-            if values:
-                row.append(" ".join(entry["value"].split()))
-            row.append("" if placeholder == main else main)
-            if text is not None:
-                row.append(counts[placeholder])
-            rows.append(row)
-    return header, rows
-
-
-def write_key(path: str, title: str, note: str, header: list[str], rows: list[list], private: bool) -> None:
-    extension = os.path.splitext(path)[1].lower()
-    if extension == ".docx":
-        docx_io.write_table_docx(path, title, [note, f"{len(rows)} placeholder(s)."], header, rows)
-    elif extension == ".csv":
-        import csv
-
-        with open(path, "w", newline="", encoding="utf-8-sig") as fh:
-            writer = csv.writer(fh)
-            writer.writerows([[note], header] + rows)
-    else:
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(f"{title}\n{note}\n\n")
-            for row in rows:
-                cells = dict(zip(header, row))
-                line = f"{cells['Placeholder']}  ({cells['Type']})"
-                if "Real value" in cells:
-                    line += f"  =  {cells['Real value']}"
-                if cells["Same as"]:
-                    line += f"  [same {cells['Type']} as {cells['Same as']}]"
-                fh.write(line + "\n")
-    if private:
-        os.chmod(path, 0o600)
-
-
 def cmd_key(args, ask, out, get) -> int:
     if not os.path.exists(args.vault):
         raise SystemExit(f"No vault at {args.vault}")
     vault, _ = _open_vault(args.vault, get)
-    text = read_document(args.document) if args.document else None
-    about = f" for {os.path.basename(args.document)}" if args.document else ""
-    stem = os.path.splitext(args.document or args.vault)[0]
-    extension = f".{args.format}"
-
-    written = []
-    if not args.safe_only:
-        path = args.output or f"{stem}.key{extension}"
-        header, rows = build_key(vault, text, values=True)
-        write_key(path, "Key" + about, CONFIDENTIAL_NOTE, header, rows, private=True)
-        written.append(("Confidential key", path, len(rows)))
-    if not args.confidential_only:
-        path = args.safe_output or f"{stem}.key-safe{extension}"
-        header, rows = build_key(vault, text, values=False)
-        write_key(path, "Key (no real values)" + about, SAFE_NOTE, header, rows, private=False)
-        written.append(("Safe key", path, len(rows)))
-    for label, path, count in written:
-        out(f"{label}: {path} ({count} placeholder(s))")
-    if not args.safe_only:
-        out(CONFIDENTIAL_NOTE)
+    result = _guard(
+        service.write_keys, vault, args.document, args.vault, args.format,
+        args.output, args.safe_output, confidential=not args.safe_only, safe=not args.confidential_only,
+    )  # fmt: skip
+    if result.confidential_path:
+        out(f"Confidential key: {result.confidential_path} ({result.count} placeholder(s))")
+    if result.safe_path:
+        out(f"Safe key: {result.safe_path} ({result.count} placeholder(s))")
+    if result.confidential_path:
+        out(service.CONFIDENTIAL_NOTE)
     return 0
 
 

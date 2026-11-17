@@ -1,0 +1,4 @@
+# Optional: the reference gliner package (PyTorch, several GB). Only used by a
+# test that checks onnx_gliner.py gives identical results, and by
+# SANITIZER_BACKEND=gliner.
+gliner[onnx]>=0.2.30

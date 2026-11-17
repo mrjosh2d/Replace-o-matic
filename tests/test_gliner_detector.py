@@ -211,3 +211,43 @@ def test_real_scan_opens_no_network_connection_at_os_level(tmp_path):
     assert result.returncode == 0, result.stderr[-2000:]
     outbound = [line for line in log.read_text().splitlines() if "AF_INET" in line]
     assert outbound == [], outbound[:5]
+
+
+@pytest.mark.model
+@needs_model
+def test_default_backend_does_not_load_pytorch():
+    import subprocess
+    import sys
+
+    script = (
+        "import sys, sanitizer_core as sc\n"
+        "assert sc.scan_text('John Smith of Acme Corporation signed.')['proposed']\n"
+        "print(sorted(m for m in ('torch', 'transformers', 'gliner') if m in sys.modules))\n"
+    )
+    root = os.path.join(os.path.dirname(__file__), "..")
+    env = {k: v for k, v in os.environ.items() if k != "SANITIZER_BACKEND"}
+    result = subprocess.run([sys.executable, "-W", "ignore", "-c", script], cwd=root, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.stdout.strip().splitlines()[-1] == "[]"
+
+
+@pytest.mark.model
+@needs_model
+def test_onnx_runner_matches_the_gliner_package():
+    pytest.importorskip("gliner")
+    pytest.importorskip("torch")
+    from onnx_gliner import OnnxGliner
+
+    ours = OnnxGliner(DEFAULT_MODEL_DIR)
+    os.environ["SANITIZER_BACKEND"] = "gliner"
+    try:
+        reference = GlinerDetector._load(DEFAULT_MODEL_DIR)
+    finally:
+        del os.environ["SANITIZER_BACKEND"]
+    labels = list(sanitizer_core.GLINER_LABELS)
+    for passage in load_eval("passages.json") + load_eval("holdout.json"):
+        a = ours.predict_entities(passage["text"], labels, threshold=0.3)
+        b = reference.predict_entities(passage["text"], labels, threshold=0.3)
+        key = lambda entities: [(e["start"], e["end"], e["label"], e["text"]) for e in entities]
+        assert key(a) == key(b), passage["id"]
+        assert all(abs(x["score"] - y["score"]) < 1e-4 for x, y in zip(a, b)), passage["id"]

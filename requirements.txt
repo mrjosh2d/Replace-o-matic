@@ -1,4 +1,7 @@
-gliner[onnx]>=0.2.30
+# Runtime. No PyTorch: the model is run with onnxruntime directly (onnx_gliner.py).
+onnxruntime>=1.20
+tokenizers>=0.20
+numpy
 cryptography>=42
 pypdf>=4
 lxml>=5

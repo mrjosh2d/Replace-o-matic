@@ -1,0 +1,5 @@
+# Building the desktop app (packaging/replace_o_matic.spec).
+-r requirements.txt
+-r requirements-pdf.txt
+-r requirements-gui.txt
+pyinstaller>=6

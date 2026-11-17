@@ -174,15 +174,97 @@ neither may run on the window's thread.
 - Real names appear on screen during review; that is the point. Do not put
   them in window titles, tooltips on the taskbar, or the recent-files list.
 
+## Status
+
+**Phase 0 is done** (`sanitizer_service.py`, `tests/test_service.py`):
+
+- The service exposes `open_matter`, `scan_document`, `occurrences`,
+  `context`, `validate_edit`, `make_item`, `commit`, `restore`, `write_keys`,
+  `vault_summary`, and the dataclasses `Item`, `Scan`, `Result`,
+  `RestoreResult`, `KeyResult`. Read its module docstring and tests before
+  writing any screen. User-facing failures are `ServiceError`.
+- `scan_document(progress=, cancelled=)`: `progress(done, total)` fires per
+  model window; `cancelled()` is polled between windows and raises
+  `sanitizer_core.ScanCancelled`. Model loading itself (about 2 seconds now)
+  reports no progress: call `sanitizer_core.default_detector()` on the worker
+  thread at start-up to preload it.
+- `commit` is all-or-nothing and verified by a test that fails the vault save.
+- `Scan.already_known` counts matter entries that occur in the document.
+- The CLI is a thin layer; the 151 tests that existed before pass unchanged.
+
+**The install-size risk is resolved.** `onnx_gliner.py` runs the model with
+`onnxruntime` and `tokenizers` only, and gives results identical to the
+`gliner` package on both labelled sets. A clean environment from
+`requirements-dev.txt` is 323 MB with no PyTorch, and passes the whole suite.
+
+**The window frame and the background thread are done** (`gui/app.py`,
+`gui/workers.py`, `gui/wording.py`, `tests/test_gui_backend.py`). This covers
+phase 2's threading and the shell part of phase 1:
+
+- `Backend` (in `gui/workers.py`) is the only thing screens use for slow work:
+  `preload_model`, `open_matter`, `scan`, `commit`, `restore`, `write_keys`,
+  `cancel`, `busy`, `shutdown`. Results arrive as the signals
+  `finished(job, result)`, `failed(job, message)`, `cancelled(job)` and
+  `progress(done, total)`. `failed` messages are already fit to show.
+- A cancel covers the running scan and any scan still queued, never a later
+  one. Unexpected errors are logged by type only (no document text) and the
+  worker thread survives them.
+- `MainWindow` has the step bar, the screen stack, `go(name)`, `new_task()`,
+  `lock()` and a close handler that asks before abandoning work. `Screen` is
+  the base class: override `enter()` and the `on_finished` / `on_failed` /
+  `on_cancelled` / `on_progress` handlers. Background results are routed to
+  whichever screen is showing.
+- `python -m gui.app` opens the frame. It looks for `gui/screens/__init__.py`
+  with an `install(window)` function that adds the screens and is expected to
+  define one named `"start"`.
+- All user-facing sentences go in `gui/wording.py`.
+- Tests run headless (`QT_QPA_PLATFORM=offscreen`, set by the test module)
+  with `pytest-qt`. One `strace` test runs a real scan inside the window
+  process and fails on any outbound connection.
+
+**The review logic is done** (`ReviewState` in `sanitizer_service.py`,
+`gui/review_model.py`, `tests/test_review.py`):
+
+- `ReviewState(scan)` holds every decision: `set_accepted`, `set_type`,
+  `edit_text`, `check_add` / `add`, `accept_all`, `mark_seen`, `occurrences`,
+  `accepted_count`, and `result()` which returns exactly what `commit` takes.
+  Refusals come back as a sentence to show. `reviewed` is False only when
+  nothing was looked at or changed.
+- `ReviewTableModel(state)` is the Qt model for the table, with the columns in
+  the mock-up. It emits `refused(message)` and `counts_changed(accepted,
+  total)`. The Review screen needs a `QTableView` on this model (inside a
+  `QSortFilterProxyModel` for sorting, type filter and search), a combo-box
+  delegate for the Type column, the context pane, and the buttons. Call
+  `model.mark_seen(row)` when a row's context is shown.
+
+**Packaging has been proven on Linux** (`packaging/replace_o_matic.spec`,
+`requirements-build.txt`):
+
+- `pyinstaller --noconfirm packaging/replace_o_matic.spec` builds a folder app
+  of 960 MB: model 594 MB, PyMuPDF 105 MB, Qt 98 MB, the rest under 170 MB.
+- `Replace-o-matic --self-test` loads the bundled model, scans a sentence and
+  exits 0. Run under `strace`, the packaged app made no outbound connection,
+  and it contains no PyTorch, transformers, gliner, QtNetwork or WebEngine.
+- Still to do for phase 6: build with the same spec on Windows and macOS
+  (PyInstaller does not cross-compile), wrap in an installer and a `.dmg`,
+  sign and notarise, and repeat the offline check on each with the network off.
+
+**What is left is the screens**: `gui/screens/` with Start, Choose, Scanning,
+Review, Done, Restore and Key (phases 1, 3, 4), then wording and access
+(phase 5), packaging (6) and the guide (7). In the Review screen, build the
+table from `Scan.items`, use `service.occurrences` / `service.context` for the
+context pane, `service.validate_edit` and `service.make_item` for edits and
+additions, and pass `Item` objects straight to `backend.commit`.
+
 ## Phases
 
 Each phase ends with tests passing and a short entry in `PLAN.md`.
 
 | # | Work | Model | Why |
 |---|---|---|---|
-| 0 | Extract `sanitizer_service.py`; CLI becomes a thin layer; progress and cancel hooks in the detector | **Opus** | Touches the commit path and the round-trip rule; must not change behaviour |
-| 1 | Window shell, step bar, Start and Choose screens, passphrase handling, settings and log | Sonnet | Routine Qt with a clear spec |
-| 2 | Worker thread, model preload, Scanning screen with progress and cancel | **Opus** | Threading and cancellation are where GUI bugs live |
+| 0 | Extract `sanitizer_service.py`; CLI becomes a thin layer; progress and cancel hooks in the detector | **Done** | See "Status" below |
+| 1 | Start and Choose screens, passphrase handling, recent-matters settings (shell, step bar and log are done) | Sonnet | Routine Qt with a clear spec |
+| 2 | Scanning screen with progress bar and Cancel (worker thread, preload and cancel are done) | Sonnet | Only the screen is left; it listens to `Backend` signals |
 | 3 | Review screen: table model, edit, add, filter, context stepping, unreviewed confirmation | Sonnet, reviewed by Opus | Largest screen but well specified; Opus checks edit/add validation against the service |
 | 4 | Done screen, Restore flow, Key flow | Sonnet | Thin screens over existing service calls |
 | 5 | Wording pass, keyboard access, error messages, empty and failure states | Sonnet | Mechanical once `wording.py` exists |
@@ -209,14 +291,12 @@ Phase 0 is worth merging on its own before any Qt code exists.
 
 ## Packaging (phase 6)
 
-The install is about 5.5 GB today because `gliner` brings PyTorch, although
-inference runs on ONNX. That is too large for a staff installer.
+PyTorch is no longer needed (see "Status"): the runtime is `onnxruntime`,
+`tokenizers`, `numpy`, `cryptography`, `lxml`, `pypdf`, optionally PyMuPDF, plus
+PySide6. Expect roughly 0.3 GB of libraries, 0.2 GB of Qt and the 0.6 GB model.
 
-- **Preferred:** package with PyInstaller (or Briefcase) and exclude `torch`
-  if `gliner` can import and run its ONNX path without it. Opus should test
-  this first; it decides the whole approach. If it cannot, the fallback is the
-  "smaller install" item in `PLAN.md`: drive the ONNX model directly with
-  `onnxruntime` and `tokenizers`. Target: under 1 GB installed.
+- Package with PyInstaller or Briefcase. Exclude `torch`, `transformers` and
+  `gliner` explicitly so a developer machine that has them cannot pull them in.
 - Bundle the model (611 MB) inside the installer so nothing is downloaded on
   the user's machine. `scripts/fetch_model.py` stays a build-time step.
 - Windows: an installer that needs no administrator rights if possible.
@@ -232,8 +312,9 @@ inference runs on ONNX. That is too large for a staff installer.
 
 ## Risks
 
-- **PyTorch in the bundle.** Covered above; settle it before phase 1 if
-  possible, since it may change the detector.
+- **Model file size.** The 611 MB model is now most of the install. A
+  quantised ONNX file would be much smaller but changes results; it would need
+  the labelled sets re-run before adopting it.
 - **Long documents.** A 120,000-word document takes about two minutes to scan
   and produces a long table. Progress, cancel and filtering are not optional.
 - **Lost passphrase.** There is no recovery. Say so when a matter is created.
