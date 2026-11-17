@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 from gui import settings, wording
 from gui.app import Screen
 from gui.review_model import FOUND_BY, SAME_AS, TEXT, TICK, TIMES, TYPE, TYPE_LABELS, ReviewTableModel
-from gui.screens.common import big, message_label, page, tab_chain
+from gui.screens.common import OutputRow, big, message_label, page, tab_chain
 
 
 def type_combo(parent=None) -> QComboBox:
@@ -199,6 +199,7 @@ class ReviewScreen(Screen):
         self.context.setAccessibleName(wording.A11Y_CONTEXT)
         self.empty = message_label()  # shown when the scan found nothing
         self.empty.setText(wording.REVIEW_EMPTY)
+        self.output = OutputRow(wording.OUTPUT_SANITIZED, "sanitized")
         self.notes = message_label()  # scan warnings and what is already known
         self.message = message_label()
 
@@ -219,12 +220,13 @@ class ReviewScreen(Screen):
         layout.addWidget(self.table, 1)
         layout.addLayout(where_row)
         layout.addWidget(self.context)
+        layout.addWidget(self.output)
         layout.addWidget(self.notes)
         layout.addWidget(self.message)
         layout.addLayout(bottom)
 
         tab_chain(self.accept_all_button, self.decline_button, self.filter, self.search, self.table,
-                  self.previous_button, self.next_button, self.add_button, self.back_button,
+                  self.previous_button, self.next_button, self.output.button, self.add_button, self.back_button,
                   self.sanitize_button)  # fmt: skip
         QShortcut(QKeySequence("Ctrl+F"), self, activated=self.focus_search)
         QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self.step_context(-1))
@@ -268,6 +270,7 @@ class ReviewScreen(Screen):
             self.notes.setText("\n".join(notes))
             self.notes.setVisible(bool(notes))
             self._show_context(-1)
+        self.output.set_source(scan.path, self.session.matter_path)
         self.message.setText("")
         self._set_busy(False)
         self._show_counts(self.model.state.accepted_count, len(self.model.state.rows))
@@ -281,7 +284,7 @@ class ReviewScreen(Screen):
 
     def _set_busy(self, busy: bool) -> None:
         for widget in (self.sanitize_button, self.back_button, self.add_button, self.table,
-                       self.accept_all_button, self.decline_button):  # fmt: skip
+                       self.accept_all_button, self.decline_button, self.output.button):  # fmt: skip
             widget.setEnabled(not busy)
 
     def _show_counts(self, accepted: int, total: int) -> None:
@@ -355,6 +358,8 @@ class ReviewScreen(Screen):
             self.model.add(*dialog.value())
 
     def sanitize(self) -> None:
+        if self.output.check():  # the reason is shown under the output row
+            return
         accepted, declined, reviewed = self.model.state.result()
         if not reviewed and self.model.state.rows:  # with nothing found there is nothing to review
             answer = QMessageBox.question(self, wording.UNREVIEWED_TITLE, wording.UNREVIEWED)
@@ -363,7 +368,8 @@ class ReviewScreen(Screen):
         self._set_busy(True)
         self.message.setText(wording.WORKING)
         session = self.session
-        self.backend.commit(session.scan, accepted, declined, reviewed, session.matter_path, session.passphrase)
+        self.backend.commit(session.scan, accepted, declined, reviewed, session.matter_path, session.passphrase,
+                            self.output.path())
 
     def on_finished(self, job: str, result) -> None:
         if job == "commit":

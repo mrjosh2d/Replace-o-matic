@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 
+import sanitizer_service as service
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -122,6 +123,77 @@ class FilePicker(QWidget):
             path, _ = QFileDialog.getOpenFileName(self, wording.APP_NAME, start, self.file_filter)
         if path:
             self.set_path(path)
+
+
+class OutputRow(QWidget):
+    """"Save the ... as: <path> [Change...]". The path starts as the service's default for
+    the document; Change opens a Save dialog and keeps the new name only if the service
+    accepts it. Refusals show on a line under the row, in staff words."""
+
+    def __init__(self, label_text: str, label: str):
+        super().__init__()
+        self.label = label  # "sanitized" or "rehydrated" (the service's word)
+        self.input_path = ""
+        self.matter_path = ""
+        self.picked = False
+        self._path = ""
+        self.caption = QLabel(label_text)
+        self.path_label = QLabel("")
+        self.path_label.setWordWrap(True)
+        self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.path_label.setAccessibleName(wording.A11Y_OUTPUT_PATH)
+        self.button = QPushButton(wording.CHANGE)
+        self.button.setAccessibleName(wording.A11Y_OUTPUT_CHANGE)
+        self.button.clicked.connect(self.change)
+        self.problem = message_label()
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self.caption)
+        row.addWidget(self.path_label, 1)
+        row.addWidget(self.button)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.addLayout(row)
+        column.addWidget(self.problem)
+
+    def path(self) -> str:
+        return self._path
+
+    def set_source(self, input_path: str, matter_path: str = "", keep_choice: bool = False) -> None:
+        """Use ``input_path`` as the document. Unless ``keep_choice`` and the user already
+        picked a name, the path goes back to the default."""
+        self.input_path, self.matter_path = input_path, matter_path
+        if not (keep_choice and self.picked):
+            self.picked = False
+            self._path = service.default_output_path(input_path, self.label) if input_path else ""
+        self.path_label.setText(self._path)
+        self.problem.setText("")
+
+    def check(self) -> str | None:
+        """The reason the current path cannot be used, in staff words (also shown), or None."""
+        reason = service.check_output_path(self.input_path, self._path, self.label, self.matter_path or None)
+        text = wording.for_staff(reason) if reason else None
+        self.problem.setText(text or "")
+        return text
+
+    def change(self) -> None:
+        formats = service.output_formats(self.input_path, self.label)
+        filters = [wording.OUTPUT_FILTERS.get(ext, f"(*{ext})") for ext in formats]
+        current = os.path.splitext(self._path)[1].lower()
+        initial = filters[formats.index(current)] if current in formats else filters[0]
+        path, chosen = QFileDialog.getSaveFileName(self, wording.APP_NAME, self._path, ";;".join(filters), initial)
+        if not path:
+            return
+        if not os.path.splitext(path)[1]:
+            index = filters.index(chosen) if chosen in filters else 0
+            path += formats[index]
+        reason = service.check_output_path(self.input_path, path, self.label, self.matter_path or None)
+        if reason:
+            self.problem.setText(wording.for_staff(reason))  # keep the old path
+            return
+        self._path, self.picked = path, True
+        self.path_label.setText(path)
+        self.problem.setText("")
 
 
 class MatterForm(QWidget):

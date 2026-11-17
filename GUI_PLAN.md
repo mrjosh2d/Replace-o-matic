@@ -285,9 +285,14 @@ phase 2's threading and the shell part of phase 1:
   `settings.json`; there is no control for it in the window.
 - Review with nothing found says so and still allows adding and continuing.
 
-**Left:** a first-run walkthrough and choosing the output file name or key
-format (the service takes both); then packaging on Windows and macOS (6) and
-the guide (7).
+**Output choices and the first-run walkthrough are done**
+(`tests/test_gui_output.py`): Review and Restore have a *Save as* row
+(`OutputRow`), checked by `service.check_output_path`, which also guards the
+CLI: no output may replace the original document or the matter file. The Key
+screen chooses .docx, .csv or .txt and remembers it. `gui/intro.py` shows four
+short pages on first run; *Help > How Replace-o-matic works* reopens them.
+
+**Left:** packaging on Windows and macOS (6) and the guide (7).
 
 ## Phases
 

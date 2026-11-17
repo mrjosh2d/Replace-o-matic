@@ -39,9 +39,8 @@ def recent_matters() -> list[str]:
     return [p for p in paths if isinstance(p, str) and os.path.exists(p)][:MAX_RECENT]
 
 
-def remember_matter(path: str) -> None:
-    path = os.path.abspath(path)
-    paths = [path] + [p for p in recent_matters() if p != path]
+def _update(key: str, value) -> None:
+    """Set one key in settings.json, keeping the firm's other settings."""
     try:
         try:
             with open(_settings_path(), encoding="utf-8") as fh:
@@ -50,11 +49,47 @@ def remember_matter(path: str) -> None:
                 data = {}
         except (OSError, ValueError):
             data = {}
-        data["recent_matters"] = paths[:MAX_RECENT]  # keep the firm's other settings
+        data[key] = value
         with open(_settings_path(), "w", encoding="utf-8") as fh:
             json.dump(data, fh)
     except OSError:
-        pass  # a list of recent files is a convenience, never a reason to fail
+        pass  # these are conveniences, never a reason to fail
+
+
+def _read(key: str, default):
+    try:
+        with open(_settings_path(), encoding="utf-8") as fh:
+            return json.load(fh).get(key, default)
+    except (OSError, ValueError, AttributeError):
+        return default
+
+
+def remember_matter(path: str) -> None:
+    path = os.path.abspath(path)
+    _update("recent_matters", ([path] + [p for p in recent_matters() if p != path])[:MAX_RECENT])
+
+
+KEY_FORMATS = ("docx", "csv", "txt")
+
+
+def key_format() -> str:
+    """The file type the last key was made as: "docx" (the default), "csv" or "txt"."""
+    value = _read("key_format", "docx")
+    return value if value in KEY_FORMATS else "docx"
+
+
+def set_key_format(fmt: str) -> None:
+    if fmt in KEY_FORMATS:
+        _update("key_format", fmt)
+
+
+def intro_seen() -> bool:
+    """True once the first-run walkthrough has been finished or closed."""
+    return _read("intro_seen", False) is True
+
+
+def set_intro_seen(seen: bool = True) -> None:
+    _update("intro_seen", seen)
 
 
 def allow_accept_all() -> bool:

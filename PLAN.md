@@ -427,7 +427,8 @@ a clean install is about 320 MB plus the 611 MB model, down from 5.5 GB.
 **The desktop window works end to end** (`gui/`, `python -m gui.app`): Start,
 Choose, Scanning, Review, Done, Restore and Key screens over
 `sanitizer_service.py`, tested headless through the real widgets. Phase 5
-(staff wording, keyboard access, empty and failure states) is done; it is not
+(staff wording, keyboard access, empty and failure states), output choices and
+a first-run walkthrough are done; it is not
 yet packaged for Windows or macOS; `GUI_PLAN.md` ("Status")
 lists what is left.
 
