@@ -111,8 +111,7 @@ def test_main_path_start_choose_scanning_stores_the_scan(qtbot, window, model, c
     assert window.session.vault == sc.new_vault()
     assert {i.value for i in window.session.scan.items} >= {"John A. Smith", "Acme Corporation"}
     assert window.session.passphrase == PASSPHRASE
-    assert current_name(window) == "scanning"  # no review screen yet: stays, with a message
-    assert "items found" in window.screens["scanning"].heading.text()
+    assert current_name(window) == "review"
     assert files_in(doc) == ["case.txt"]  # nothing is written before the last step
 
 

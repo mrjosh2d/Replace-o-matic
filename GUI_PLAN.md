@@ -256,7 +256,12 @@ exists. Recent matters are matter-file paths in `QSettings` (`screens/recent.py`
 PySide6 is capped below 6.12: 6.12.0 drops a reference to `True` on every queued
 signal and aborts the app on Python 3.11; a test guards it.
 
-**What is left is the screens**: Review, Done, Restore and Key (phases 3, 4), then wording and access
+**The Review screen is done** (`gui/screens/review.py`, `tests/test_gui_review.py`):
+table behind a sort/filter/search proxy, Type drop-down, context stepping,
+add dialog, unreviewed confirmation. It sets `session.result` after commit and
+goes to `"done"` if that screen exists.
+
+**What is left is the screens**: Done, Restore and Key (phase 4), then wording and access
 (phase 5), packaging (6) and the guide (7). In the Review screen, build the
 table from `Scan.items`, use `service.occurrences` / `service.context` for the
 context pane, `service.validate_edit` and `service.make_item` for edits and
@@ -271,7 +276,7 @@ Each phase ends with tests passing and a short entry in `PLAN.md`.
 | 0 | Extract `sanitizer_service.py`; CLI becomes a thin layer; progress and cancel hooks in the detector | **Done** | See "Status" below |
 | 1 | Start and Choose screens, passphrase handling, recent-matters settings | **Done** | Routine Qt with a clear spec |
 | 2 | Scanning screen with progress bar and Cancel | **Done** | Only the screen is left; it listens to `Backend` signals |
-| 3 | Review screen: table model, edit, add, filter, context stepping, unreviewed confirmation | Sonnet, reviewed by Opus | Largest screen but well specified; Opus checks edit/add validation against the service |
+| 3 | Review screen: table model, edit, add, filter, context stepping, unreviewed confirmation | **Done** | Largest screen but well specified; Opus checks edit/add validation against the service |
 | 4 | Done screen, Restore flow, Key flow | Sonnet | Thin screens over existing service calls |
 | 5 | Wording pass, keyboard access, error messages, empty and failure states | Sonnet | Mechanical once `wording.py` exists |
 | 6 | Packaging: Windows installer and macOS app, model bundled, offline check of the packaged app | **Opus** | Hardest to get right; see below |

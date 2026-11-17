@@ -82,6 +82,32 @@ LOADING_MODEL_NOTE = "Loading the language model (about 10 seconds the first tim
 SCAN_DONE_NO_REVIEW = "Scan finished: {count} items found. The review step is not available yet."
 CHOOSE_ANOTHER = "Choose another document"
 
+# ---- Review
+REVIEW_COUNT = "{count} items found"
+ACCEPT_ALL = "Accept all"
+DECLINE_SELECTED = "Decline selected"
+FILTER_LABEL = "Show:"
+FILTER_ALL = "all"
+SEARCH_PLACEHOLDER = "Search the list"
+WHERE_IT_APPEARS = "Where it appears ({n} of {m})"
+WHERE_NOTHING = "Select a line above to see where it appears."
+WHERE_NOT_FOUND = "This text was not found in the document."
+PREVIOUS = "Previous"
+NEXT = "Next"
+ADD_MISSED = "+ Add something missed"
+SANITIZE_COUNT = "Sanitize ({n})"
+SANITIZING = "Writing the sanitized document…"
+SANITIZED_NO_DONE = "Finished. The sanitized document was saved as {path}"
+UNREVIEWED_BUTTON_YES = "Continue anyway"
+UNREVIEWED_BUTTON_NO = "Go back and review"
+LEAVE_REVIEW_TITLE = "Go back?"
+LEAVE_REVIEW = "Your changes to the list will be lost. Nothing has been saved."
+ADD_TITLE = "Add something missed"
+ADD_TEXT_LABEL = "Exact text, as it appears in the document"
+ADD_TYPE_LABEL = "Type"
+ADD_COUNT = "Appears {n} times. First place:"
+ADD_NOT_FOUND = "Not found in the document."
+
 
 def plain(message: str) -> str:
     """Service and library messages in staff wording."""
