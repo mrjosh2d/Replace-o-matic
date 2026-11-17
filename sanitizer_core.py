@@ -156,6 +156,23 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"(?:Trust Company|TRUST COMPANY)(?!\w)"
         ),
     ),
+    # Banks: "U.S. Bank", "First Prairie Bank", "Bank of America, N.A.". A bank
+    # name is often made of common words, so it is matched by shape; generic
+    # phrases ("The Bank", "Federal Reserve Bank") are dropped in _clean_spans.
+    (
+        "company",
+        re.compile(
+            _B + _CO_WORD + r"(?:[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,3}?[ \t]+(?:Bank|BANK)"
+            r"(?![ \t]+(?:of|OF)\b)(?:,?[ \t]+N\.A\.)?(?!\w)"
+        ),
+    ),
+    (
+        "company",
+        re.compile(
+            r"(?<![\w-])(?<!Reserve )(?<!RESERVE )(?:Bank of|BANK OF)[ \t]+" + _CO_WORD
+            + r"(?:[ \t]+" + _CO_WORD + r")?(?:,?[ \t]+N\.A\.)?(?!\w)"
+        ),
+    ),
     # Law-firm lists: "Oyelaran, Schmidt & Lindqvist PC". Each listed name is one
     # word, and "Esq."/"Jr." may not be one, so a preceding person is not swallowed.
     (
@@ -423,6 +440,13 @@ def _is_vocabulary(word: str, lowercase_words: set[str] = frozenset()) -> bool:
         return False
     return True
 
+
+# Words that, alone before "Bank", describe a kind of bank and do not name one.
+_GENERIC_BANK_WORDS = {
+    "federal", "reserve", "central", "national", "state", "commercial", "savings", "investment",
+    "custodian", "corporate", "correspondent", "depository", "issuing", "paying", "world",
+    "home", "loan", "land", "land-grant", "member", "foreign", "domestic", "local", "&",
+}  # fmt: skip
 
 # Never a name, or part of one, on their own.
 _FUNCTION_WORDS = {
@@ -732,6 +756,12 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             weak = re.search(r"[,\s]+(?:&\s+)?(?:Limited|LIMITED|Company|COMPANY|" + _CO_KIND + r")$", text[start:end])
             if re.search(r"(?i)\btrust company$", text[start:end]):
                 weak = None  # "The Depository Trust Company": a kind of institution, not a heading
+            bank = re.fullmatch(r"(.+?)[ \t]+(?:Bank|BANK)(?:,?[ \t]+N\.A\.)?", text[start:end])
+            if bank and all(
+                w.casefold().rstrip(".") in _FUNCTION_WORDS | _DEFINED_TERMS | _GENERIC_BANK_WORDS
+                for w in bank.group(1).split()
+            ):
+                continue  # "The Bank", "Federal Reserve Bank", "Custodian Bank"
             if weak and _is_generic(
                 Detection(start, start + weak.start(), "company"), text[start : start + weak.start()], lowercase_words
             ):

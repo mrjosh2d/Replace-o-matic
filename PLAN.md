@@ -13,7 +13,8 @@ machine, and swapped back afterwards using a local JSON vault.
 | 3 | Long-document handling and detection quality: labelled passages, measurement script, gap fixes | **Done** |
 | 4 | Human review, "I'm feeling lucky", encrypted vault, command-line tool, .docx/PDF input | **Done** |
 | 5 | .docx in, .docx out with formatting kept; headers, footers, footnotes, endnotes, comments | **Done** |
-| 6 | Labelled measurement on real documents; web addresses, middle names | **Done** |
+| 6 | Labelled measurement on real documents; web addresses, middle names, bank names | **Done** |
+| 7 | Key document: placeholder-to-value table to read alongside a sanitized document | Next |
 
 ## Step 1: deterministic core (done)
 
@@ -294,7 +295,7 @@ Limits:
   `rehydrate` the full value sits on that first line.
 - Text inside embedded objects (charts, embedded spreadsheets, images) is not
   touched. Field codes and hyperlink targets are not touched, only visible text.
-- Not opened in Microsoft Word here; only LibreOffice was available.
+- Opened in LibreOffice here; the owner confirmed it looks right in Microsoft Word.
 
 ## Step 6: labelled measurement on real documents (done)
 
@@ -334,15 +335,40 @@ Still not fully caught:
 - The firm's tagline under its name (accepted by the owner as partial).
 - "The Depository Trust Company" where a PDF line break falls inside it.
   Names broken across PDF lines are a general limit of pattern matching.
-- "FAMILY WEALTH TRUST" on its own (the forms with "Doe" are caught) and
-  "U.S. Bank" inside the regulatory phrase "U.S. Bank as Trustee": both are
+- "FAMILY WEALTH TRUST" on its own (the forms with "Doe" are caught): it is
   ordinary vocabulary to the filter.
+
+Decided by the owner afterwards: "U.S. Bank" counts as sensitive, as the safe
+call. Bank names are now matched by shape ("U.S. Bank", "First Prairie Bank",
+"Bank of America, N.A."), with generic phrases ("The Bank", "Federal Reserve
+Bank") filtered out. The owner also confirmed the redacted .docx looks right
+in Microsoft Word.
 
 How far to trust these figures: the documents are vendor samples with invented
 parties, they contain almost no identifiers (no SSNs, account numbers or
 emails), and the labels have now been used to fix things. They show the tool
 handles this kind of estate-planning document well; they do not replace the
 90% unseen-text figure from step 3 for documents of a new kind.
+
+## Step 7: key document (next)
+
+A "key" to read alongside a sanitized document or an analysis of it: a table of
+placeholder, type and real value, grouped so that aliases of one entity sit
+together (`[COMPANY_1]` Acme Corporation; `[COMPANY_1_ALIAS_1]` Acme Corp.).
+
+- `sanitizer_cli.py key --vault matter.vault -o key.docx` (also .csv / .txt).
+  With a document argument, only the placeholders that appear in that
+  document are listed, in order of first appearance, with a count.
+- The key holds the real names, so it is as sensitive as the vault. It is
+  written owner-only, marked CONFIDENTIAL at the top, and gitignored. It must
+  never be sent with the sanitized document.
+- A second, safe variant (`--no-values`) lists placeholder, type and which
+  placeholders are the same entity, with no real values. That one can be given
+  to an LLM together with the sanitized text, so it knows `[PERSON_1_ALIAS_1]`
+  is the same person as `[PERSON_1]`.
+
+To confirm with the owner: whether "key" means the confidential one, the safe
+one, or both.
 
 ## Later
 
