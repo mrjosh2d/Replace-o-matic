@@ -12,3 +12,7 @@ __pycache__/
 
 # Local model weights
 models/
+
+# Packaging output
+build/
+dist/

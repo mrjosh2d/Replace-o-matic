@@ -168,7 +168,23 @@ def log_path() -> str:
     return os.path.join(folder, "replace-o-matic.log")
 
 
+def self_test() -> int:
+    """Load the model and scan one sentence, with no window. Used to check a
+    packaged build: exit code 0 means the bundle is complete and working."""
+    import sanitizer_service as service
+
+    proposal = sc.scan_text("John Smith of Acme Corporation lives at 12 Oak Street, Akron, OH 44301.")
+    values = {entry["value"] for entry in proposal["proposed"].values()}
+    ok = "John Smith" in values and any("Acme" in v for v in values) and any("Akron" in v for v in values)
+    loaded = sorted(m for m in ("torch", "transformers", "gliner") if m in sys.modules)
+    print(f"self-test: {'ok' if ok and not loaded else 'FAILED'}; found {len(values)} items; "
+          f"pdf support: {service.pdf_io.available()}; unwanted modules: {loaded}")
+    return 0 if ok and not loaded else 1
+
+
 def main() -> int:
+    if "--self-test" in sys.argv:
+        return self_test()
     # The log records events and error types only: never document text, values or passphrases.
     logging.basicConfig(filename=log_path(), level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     app = QApplication(sys.argv)

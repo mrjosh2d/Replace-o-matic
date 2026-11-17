@@ -237,6 +237,18 @@ phase 2's threading and the shell part of phase 1:
   delegate for the Type column, the context pane, and the buttons. Call
   `model.mark_seen(row)` when a row's context is shown.
 
+**Packaging has been proven on Linux** (`packaging/replace_o_matic.spec`,
+`requirements-build.txt`):
+
+- `pyinstaller --noconfirm packaging/replace_o_matic.spec` builds a folder app
+  of 960 MB: model 594 MB, PyMuPDF 105 MB, Qt 98 MB, the rest under 170 MB.
+- `Replace-o-matic --self-test` loads the bundled model, scans a sentence and
+  exits 0. Run under `strace`, the packaged app made no outbound connection,
+  and it contains no PyTorch, transformers, gliner, QtNetwork or WebEngine.
+- Still to do for phase 6: build with the same spec on Windows and macOS
+  (PyInstaller does not cross-compile), wrap in an installer and a `.dmg`,
+  sign and notarise, and repeat the offline check on each with the network off.
+
 **What is left is the screens**: `gui/screens/` with Start, Choose, Scanning,
 Review, Done, Restore and Key (phases 1, 3, 4), then wording and access
 (phase 5), packaging (6) and the guide (7). In the Review screen, build the
