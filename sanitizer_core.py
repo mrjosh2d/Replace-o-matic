@@ -156,6 +156,23 @@ REGEX_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"(?:Trust Company|TRUST COMPANY)(?!\w)"
         ),
     ),
+    # Banks: "U.S. Bank", "First Prairie Bank", "Bank of America, N.A.". A bank
+    # name is often made of common words, so it is matched by shape; generic
+    # phrases ("The Bank", "Federal Reserve Bank") are dropped in _clean_spans.
+    (
+        "company",
+        re.compile(
+            _B + _CO_WORD + r"(?:[ \t]+(?:&[ \t]+)?" + _CO_WORD + r"){0,3}?[ \t]+(?:Bank|BANK)"
+            r"(?![ \t]+(?:of|OF)\b)(?:,?[ \t]+N\.A\.)?(?!\w)"
+        ),
+    ),
+    (
+        "company",
+        re.compile(
+            r"(?<![\w-])(?<!Reserve )(?<!RESERVE )(?:Bank of|BANK OF)[ \t]+" + _CO_WORD
+            + r"(?:[ \t]+" + _CO_WORD + r")?(?:,?[ \t]+N\.A\.)?(?!\w)"
+        ),
+    ),
     # Law-firm lists: "Oyelaran, Schmidt & Lindqvist PC". Each listed name is one
     # word, and "Esq."/"Jr." may not be one, so a preceding person is not swallowed.
     (
@@ -423,6 +440,13 @@ def _is_vocabulary(word: str, lowercase_words: set[str] = frozenset()) -> bool:
         return False
     return True
 
+
+# Words that, alone before "Bank", describe a kind of bank and do not name one.
+_GENERIC_BANK_WORDS = {
+    "federal", "reserve", "central", "national", "state", "commercial", "savings", "investment",
+    "custodian", "corporate", "correspondent", "depository", "issuing", "paying", "world",
+    "home", "loan", "land", "land-grant", "member", "foreign", "domestic", "local", "&",
+}  # fmt: skip
 
 # Never a name, or part of one, on their own.
 _FUNCTION_WORDS = {
@@ -732,6 +756,12 @@ def _clean_spans(text: str, detections: Iterable[Detection]) -> list[Detection]:
             weak = re.search(r"[,\s]+(?:&\s+)?(?:Limited|LIMITED|Company|COMPANY|" + _CO_KIND + r")$", text[start:end])
             if re.search(r"(?i)\btrust company$", text[start:end]):
                 weak = None  # "The Depository Trust Company": a kind of institution, not a heading
+            bank = re.fullmatch(r"(.+?)[ \t]+(?:Bank|BANK)(?:,?[ \t]+N\.A\.)?", text[start:end])
+            if bank and all(
+                w.casefold().rstrip(".") in _FUNCTION_WORDS | _DEFINED_TERMS | _GENERIC_BANK_WORDS
+                for w in bank.group(1).split()
+            ):
+                continue  # "The Bank", "Federal Reserve Bank", "Custodian Bank"
             if weak and _is_generic(
                 Detection(start, start + weak.start(), "company"), text[start : start + weak.start()], lowercase_words
             ):
@@ -1024,14 +1054,62 @@ def apply_vault(text: str, vault: dict) -> str:
     return "".join(out) + text[pos:]
 
 
-def rehydrate_text(text: str, vault: dict) -> str:
+def _loose_placeholder_re() -> re.Pattern[str]:
+    """Placeholders as an LLM or a Markdown renderer may hand them back:
+    ``[person_1]``, ``[Person 1]``, ``[PERSON-1]``, ``\\[PERSON\\_1\\]``, ``[ PERSON_1 ]``,
+    and the bare ``PERSON_1`` with the brackets dropped."""
+    sep = r"(?:\\_|[ _-])"
+    types = "|".join(sep.join(part for part in t.upper().split("_")) for t in ENTITY_TYPES)
+    bracketed = (
+        r"\\?\[\s*(?i:(?P<type>" + types + r")" + sep + r"?\s*(?P<number>\d+)"
+        r"(?:" + sep + r"?\s*alias" + sep + r"?\s*(?P<alias>\d+))?)\s*\\?\]"
+    )
+    bare = (
+        r"(?<![\w\[])(?P<btype>" + "|".join(t.upper() for t in ENTITY_TYPES) + r")_(?P<bnumber>\d+)"
+        r"(?:_ALIAS_(?P<balias>\d+))?(?![\w\]])"
+    )
+    return re.compile(bracketed + "|" + bare)
+
+
+LOOSE_PLACEHOLDER_RE = _loose_placeholder_re()
+
+
+def find_placeholders(text: str, vault: dict, tolerant: bool = False) -> list[tuple[int, int, str]]:
+    """Where the vault's placeholders occur in ``text``: (start, end, placeholder).
+
+    With ``tolerant``, altered forms are recognised too (see
+    :data:`LOOSE_PLACEHOLDER_RE`) and reported under their exact name.
+    Placeholders the vault does not know are not returned.
+    """
+    mappings = _mappings(vault)
+    found = []
+    for m in (LOOSE_PLACEHOLDER_RE if tolerant else PLACEHOLDER_RE).finditer(text):
+        if tolerant:
+            etype = re.sub(r"[^A-Za-z]+", "_", m.group("type") or m.group("btype")).upper()
+            alias = m.group("alias") or m.group("balias")
+            name = f"[{etype}_{int(m.group('number') or m.group('bnumber'))}"
+            name += f"_ALIAS_{int(alias)}]" if alias else "]"
+        else:
+            name = m.group(0)
+        if name in mappings:
+            found.append((m.start(), m.end(), name))
+    return found
+
+
+def rehydrate_text(text: str, vault: dict, tolerant: bool = False) -> str:
     """Replace placeholders with their real values. Unknown placeholders are kept.
 
     Single pass over placeholder tokens only, so restored values are never
     re-scanned and one placeholder can never match inside another.
+
+    ``tolerant`` also restores placeholders whose spelling was altered on the
+    way back (lower case, spaces, escaped or missing brackets). It is off by
+    default: exact matching is what guarantees the round trip, and tolerant
+    matching is for text that has been through an LLM or an editor.
     """
     mappings = _mappings(vault)
-    return PLACEHOLDER_RE.sub(
-        lambda m: mappings[m.group(0)]["value"] if m.group(0) in mappings else m.group(0),
-        text,
-    )
+    out, pos = [], 0
+    for start, end, placeholder in find_placeholders(text, vault, tolerant):
+        out += [text[pos:start], mappings[placeholder]["value"]]
+        pos = end
+    return "".join(out) + text[pos:]

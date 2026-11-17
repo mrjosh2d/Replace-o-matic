@@ -1,0 +1,4 @@
+# Optional: redacted PDF output and better PDF reading. PyMuPDF is AGPL-licensed
+# (or commercial from Artifex). Without it, PDFs are read with pypdf and come
+# back as plain text.
+pymupdf>=1.24

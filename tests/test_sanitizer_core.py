@@ -73,6 +73,9 @@ def values(proposal):
         ("See https://www.acme-law.com/team/j.smith?id=4.", "url", "https://www.acme-law.com/team/j.smith?id=4"),
         ("visit smithlaw.com, or call", "url", "smithlaw.com"),
         ("such as The Depository Trust Company, Euroclear", "company", "The Depository Trust Company"),
+        ('satisfy the "U.S. Bank as Trustee" requirement', "company", "U.S. Bank"),
+        ("held at First Prairie Bank, N.A. in trust", "company", "First Prairie Bank, N.A."),
+        ("wired from Bank of America, N.A. on", "company", "Bank of America, N.A."),
         ("Call (212) 555-0147 now", "phone", "(212) 555-0147"),
         ("Call +1 212.555.0147 now", "phone", "+1 212.555.0147"),
         ("Call 212-555-0147.", "phone", "212-555-0147"),
@@ -255,6 +258,18 @@ def test_url_and_email_do_not_collide():
     assert values(proposal) == {"[EMAIL_1]": "info@acme-law.com", "[URL_1]": "www.acme-law.com"}
     vault = merge_vault(None, proposal["proposed"])
     assert apply_vault(text, vault) == "Write to [EMAIL_1] or see [URL_1]."
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The Bank may rely on this. Any Bank shall comply.",
+        "the Federal Reserve Bank of New York or a Federal Home Loan Bank",
+        "A Custodian Bank and the Trustee Bank agree; the National Bank Act applies.",
+    ],
+)
+def test_generic_bank_phrases_are_not_bank_names(text):
+    assert scan_text(text, ner=False)["proposed"] == {}
 
 
 def test_shared_first_name_is_not_linked_to_either_person():

@@ -343,3 +343,150 @@ def test_empty_document_is_reported(tmp_path):
     path.write_text("  \n")
     with pytest.raises(SystemExit, match="No text found"):
         cli.read_document(str(path))
+
+
+# ---------------------------------------------------------------- key document
+
+
+def make_case(tmp_path):
+    doc = tmp_path / "case.txt"
+    doc.write_text(TEXT)
+    vault_path = str(tmp_path / "matter.vault")
+    run(["sanitize", str(doc), "--vault", vault_path, "--lucky"])
+    return str(tmp_path / "case.sanitized.txt"), vault_path
+
+
+def test_key_writes_confidential_and_safe_tables(tmp_path):
+    import csv
+    import stat
+
+    sanitized, vault_path = make_case(tmp_path)
+    code, printed = run(["key", sanitized, "--vault", vault_path, "--format", "csv"])
+    assert code == 0 and "CONFIDENTIAL" in printed
+
+    confidential = tmp_path / "case.sanitized.key.csv"
+    safe = tmp_path / "case.sanitized.key-safe.csv"
+    rows = list(csv.reader(open(confidential, encoding="utf-8-sig")))
+    assert rows[0][0].startswith("CONFIDENTIAL")
+    assert rows[1] == ["Placeholder", "Type", "Real value", "Same as", "Times in document"]
+    table = {r[0]: r for r in rows[2:]}
+    assert table["[PERSON_1]"][2] == "John A. Smith" and table["[PERSON_1]"][3] == ""
+    assert table["[PERSON_1_ALIAS_1]"][2:5] == ["Smith", "[PERSON_1]", "1"]
+    assert table["[COMPANY_1_ALIAS_1]"][2:4] == ["Acme", "[COMPANY_1]"]
+    assert [r[0] for r in rows[2:4]] == ["[PERSON_1]", "[PERSON_1_ALIAS_1]"]  # aliases sit under their entity
+    assert stat.S_IMODE(confidential.stat().st_mode) == 0o600
+
+    safe_text = safe.read_text(encoding="utf-8-sig")
+    for real in ("Smith", "Acme", "123-45-6789", "Arbitration"):
+        assert real not in safe_text
+    assert "[PERSON_1_ALIAS_1],person,[PERSON_1],1" in safe_text
+
+
+def test_key_lists_only_placeholders_in_the_document_and_works_from_the_original(tmp_path):
+    sanitized, vault_path = make_case(tmp_path)
+    other = tmp_path / "answer.txt"
+    other.write_text("Only [COMPANY_1] and [PERSON_1] matter; [PERSON_1] twice. Ignore [PERSON_99].")
+    vault = sc.load_vault(vault_path, passphrase=PASSPHRASE)
+    header, rows = cli.build_key(vault, other.read_text())
+    assert [(r[0], r[-1]) for r in rows] == [("[COMPANY_1]", 1), ("[PERSON_1]", 2)]
+    # given the original instead of the sanitized text, the same key comes out
+    assert cli.build_key(vault, TEXT) == cli.build_key(vault, open(sanitized).read())
+    # with no document, the whole vault is listed and there is no count column
+    header, rows = cli.build_key(vault)
+    assert header[-1] == "Same as" and len(rows) == len(vault["mappings"])
+
+
+def test_key_docx_and_txt_formats(tmp_path):
+    sanitized, vault_path = make_case(tmp_path)
+    run(["key", sanitized, "--vault", vault_path])
+    text = cli.read_document(str(tmp_path / "case.sanitized.key.docx"))
+    assert "CONFIDENTIAL" in text and "John A. Smith" in text and "[PERSON_1_ALIAS_1]" in text
+    safe = cli.read_document(str(tmp_path / "case.sanitized.key-safe.docx"))
+    assert "Smith" not in safe and "[PERSON_1]" in safe
+
+    run(["key", sanitized, "--vault", vault_path, "--format", "txt", "--safe-only"])
+    assert not (tmp_path / "case.sanitized.key.txt").exists()
+    lines = (tmp_path / "case.sanitized.key-safe.txt").read_text()
+    assert "[PERSON_1_ALIAS_1]  (person)  [same person as [PERSON_1]]" in lines
+
+
+# ---------------------------------------------------------------- altered placeholders
+
+
+def test_tolerant_rehydrate_restores_altered_placeholders():
+    vault = sc.merge_vault(
+        None, sc.propose_mappings([("person", "Bob Lee"), ("person", "Lee"), ("financial_id", "123-45-6789")])[0]
+    )
+    altered = (
+        "a [person_1] b [Person 1] c \\[PERSON\\_1\\] d PERSON_1 e [PERSON-1-alias-1] "
+        "f [financial id 1] g [ FINANCIAL_ID_1 ] h [PERSON_1]'s"
+    )
+    assert sc.rehydrate_text(altered, vault, tolerant=True) == (
+        "a Bob Lee b Bob Lee c Bob Lee d Bob Lee e Lee f 123-45-6789 g 123-45-6789 h Bob Lee's"
+    )
+    # exact matching is the default, and leaves altered forms alone
+    assert sc.rehydrate_text(altered, vault) == altered[: altered.index("[PERSON_1]'s")] + "Bob Lee's"
+
+
+def test_tolerant_rehydrate_leaves_lookalikes_and_unknown_placeholders():
+    vault = sc.merge_vault(None, sc.propose_mappings([("person", "Bob Lee")])[0])
+    text = "PERSON_10, PERSON_1A, person 1, Person_1, [PERSON_2], [1], [see person 1 above], xPERSON_1"
+    assert sc.rehydrate_text(text, vault, tolerant=True) == text
+
+
+def test_cli_rehydrate_is_tolerant_by_default_and_strict_on_request(tmp_path):
+    sanitized, vault_path = make_case(tmp_path)
+    answer = tmp_path / "answer.txt"
+    answer.write_text("**[person_1]** owes \\[COMPANY\\_1\\]; [PERSON_1] agreed.")
+    code, printed = run(["rehydrate", str(answer), "--vault", vault_path])
+    assert (tmp_path / "answer.rehydrated.txt").read_text() == (
+        "**John A. Smith** owes Acme Corporation; John A. Smith agreed."
+    )
+    assert "spelling had been altered" in printed and "[person_1]" in printed
+
+    run(["rehydrate", str(answer), "--vault", vault_path, "--strict"])
+    assert (tmp_path / "answer.rehydrated.txt").read_text() == (
+        "**[person_1]** owes \\[COMPANY\\_1\\]; John A. Smith agreed."
+    )
+
+
+# ---------------------------------------------------------------- redacted PDF
+
+
+def test_pdf_in_pdf_out_removes_text_and_metadata(tmp_path):
+    pymupdf = pytest.importorskip("pymupdf")
+    import pdf_io
+
+    source = tmp_path / "case.pdf"
+    document = pymupdf.open()
+    page = document.new_page()
+    # a narrow box, so the names wrap across lines inside one paragraph
+    page.insert_textbox(
+        pymupdf.Rect(72, 72, 300, 300),
+        "Plaintiff John A. Smith sued Acme Corporation in March. Smith's SSN is 123-45-6789 and "
+        "the claim against Acme Corporation was settled by John A. Smith in full.",
+        fontsize=12,
+    )
+    document.set_metadata({"author": "John A. Smith", "title": "Complaint"})
+    document.save(source)
+
+    assert "John A. Smith sued Acme Corporation" in cli.read_document(str(source))  # wraps are joined
+    code, printed = run(["sanitize", str(source), "--vault", str(tmp_path / "v"), "--lucky"])
+    assert code == 0
+    output = tmp_path / "case.sanitized.pdf"
+
+    text = pdf_io.read_pdf(str(output))
+    raw = output.read_bytes()
+    for leak in ("Smith", "Acme", "123-45-6789"):
+        assert leak not in text and leak.encode() not in raw, leak
+    for kept in ("Plaintiff", "sued", "in March", "SSN is", "was settled by", "in full", "[PERSON_1]", "[COMPANY_1]"):
+        assert kept in " ".join(text.split()), kept
+    with pymupdf.open(output) as redacted:
+        assert not redacted.metadata.get("author") and not redacted.metadata.get("title")
+        assert len(redacted) == 1
+
+    # the key and a text copy still work from the redacted PDF
+    vault = sc.load_vault(tmp_path / "v", passphrase=PASSPHRASE)
+    assert sc.rehydrate_text(text, vault).count("John A. Smith") == 2
+    run(["sanitize", str(source), "--vault", str(tmp_path / "v"), "--lucky", "-o", str(tmp_path / "plain.txt")])
+    assert "[PERSON_1]" in (tmp_path / "plain.txt").read_text()

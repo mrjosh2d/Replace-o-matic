@@ -13,7 +13,9 @@ machine, and swapped back afterwards using a local JSON vault.
 | 3 | Long-document handling and detection quality: labelled passages, measurement script, gap fixes | **Done** |
 | 4 | Human review, "I'm feeling lucky", encrypted vault, command-line tool, .docx/PDF input | **Done** |
 | 5 | .docx in, .docx out with formatting kept; headers, footers, footnotes, endnotes, comments | **Done** |
-| 6 | Labelled measurement on real documents; web addresses, middle names | **Done** |
+| 6 | Labelled measurement on real documents; web addresses, middle names, bank names | **Done** |
+| 7 | Key document: confidential and safe placeholder tables | **Done** |
+| 8 | Altered placeholders tolerated on re-hydration; redacted PDF output | **Done** |
 
 ## Step 1: deterministic core (done)
 
@@ -294,7 +296,8 @@ Limits:
   `rehydrate` the full value sits on that first line.
 - Text inside embedded objects (charts, embedded spreadsheets, images) is not
   touched. Field codes and hyperlink targets are not touched, only visible text.
-- Not opened in Microsoft Word here; only LibreOffice was available.
+- Opened in LibreOffice here; the owner confirmed it looks right in Microsoft Word. With bank names caught, the reviewed-label score is 83 of
+88 labels and 98.2% of sensitive characters.
 
 ## Step 6: labelled measurement on real documents (done)
 
@@ -334,9 +337,14 @@ Still not fully caught:
 - The firm's tagline under its name (accepted by the owner as partial).
 - "The Depository Trust Company" where a PDF line break falls inside it.
   Names broken across PDF lines are a general limit of pattern matching.
-- "FAMILY WEALTH TRUST" on its own (the forms with "Doe" are caught) and
-  "U.S. Bank" inside the regulatory phrase "U.S. Bank as Trustee": both are
+- "FAMILY WEALTH TRUST" on its own (the forms with "Doe" are caught): it is
   ordinary vocabulary to the filter.
+
+Decided by the owner afterwards: "U.S. Bank" counts as sensitive, as the safe
+call. Bank names are now matched by shape ("U.S. Bank", "First Prairie Bank",
+"Bank of America, N.A."), with generic phrases ("The Bank", "Federal Reserve
+Bank") filtered out. The owner also confirmed the redacted .docx looks right
+in Microsoft Word.
 
 How far to trust these figures: the documents are vendor samples with invented
 parties, they contain almost no identifiers (no SSNs, account numbers or
@@ -344,7 +352,88 @@ emails), and the labels have now been used to fix things. They show the tool
 handles this kind of estate-planning document well; they do not replace the
 90% unseen-text figure from step 3 for documents of a new kind.
 
+## Step 7: key document (done)
+
+```
+.venv/bin/python sanitizer_cli.py key contract.sanitized.docx --vault matter.vault
+```
+
+Writes two tables of what each placeholder stands for, with aliases listed
+under their entity and a "Same as" column pointing at it:
+
+- **Confidential key** (`<document>.key.docx`): placeholder, type, real value,
+  same-as, and how many times it appears. It holds the real names, so it is as
+  sensitive as the vault: marked CONFIDENTIAL at the top, written owner-only,
+  gitignored. It must never be sent with the sanitized document.
+- **Safe key** (`<document>.key-safe.docx`): the same table without the real
+  values. It can accompany the sanitized text, so a reader or an LLM knows that
+  `[PERSON_1_ALIAS_1]` is the same person as `[PERSON_1]`.
+
+Given a document (sanitized or original), only its placeholders are listed, in
+order of first appearance. With no document the whole vault is listed.
+`--format csv` or `txt`, `--confidential-only`, `--safe-only`.
+
+## Step 8: altered placeholders and redacted PDFs (done)
+
+**Altered placeholders.** Text that has been through an LLM or a Markdown
+renderer often comes back with placeholders respelled. `rehydrate` now
+restores `[person_1]`, `[Person 1]`, `[PERSON-1]`, `\[PERSON\_1\]`,
+`[ PERSON_1 ]` and the bare `PERSON_1`, and lists the altered forms it found.
+`--strict` restores exact spellings only. In `sanitizer_core`,
+`rehydrate_text(..., tolerant=True)` turns it on; the default stays exact,
+because exact matching is what the round-trip guarantee rests on.
+
+**Redacted PDFs.** With PyMuPDF installed, a PDF given to `sanitize` comes
+back as a PDF (`pdf_io.py`):
+
+- The sensitive text is deleted from the page content, not covered, and the
+  placeholder is printed where it was. The raw file no longer contains it.
+- Document metadata is cleared (the SCRUT sample named a real author there).
+- Text is read a paragraph at a time, so a name that wraps onto the next line
+  is one string. This also removes the "PDF line break inside a name" limit
+  noted in steps 4 and 6.
+- The written file is read back and must contain no vault value.
+- PyMuPDF makes no network connection (checked with `strace` during a redaction).
+
+With PDFs read this way, the reviewed-label score is 84 of 88 labels and 98.5%
+of sensitive characters. What is left is the firm's tagline (accepted as
+partial by the owner) and "FAMILY WEALTH TRUST" without a name.
+
+Limits of PDF output:
+
+- A placeholder is usually longer than the name it replaces, so it is printed
+  in a smaller, plain font to fit the space.
+- On justified lines the words after a placeholder sit slightly further left
+  than in the original (PyMuPDF closes up part of the gap). Nothing overlaps,
+  but the right edge of that line is no longer flush.
+- Scanned pages (images of text) are not touched: they need OCR first.
+  Annotations, form fields and attachments are not examined.
+- `rehydrate` does not write PDFs: an analysis comes back as text.
+
+**Licence.** PyMuPDF is AGPL (or commercial from Artifex). It is optional
+(`requirements-pdf.txt`): without it PDFs are read with pypdf and written as
+plain text. Internal use is unaffected; distributing the tool with PyMuPDF
+bundled would bring the AGPL's terms with it.
+
 ## Later
 
-- Tolerate placeholders an LLM has altered (`[person_1]`, `PERSON 1`).
-- Redacted PDF output (today a PDF comes back as plain text).
+Decided by the owner: PyMuPDF's AGPL licence is acceptable for now. Revisit it
+before the tool is distributed to anyone outside the firm.
+
+**Next: a desktop window in place of the terminal.** The plan is in
+`GUI_PLAN.md` (PySide6, Windows and macOS, for non-technical staff).
+
+Other candidates, not yet prioritised:
+
+- **Setup for a normal computer:** a one-step installer and a plain-language
+  user guide. Today the tool needs Python, a 5 GB install and a terminal.
+- **A simple window** in place of the terminal: pick a file, review the items,
+  save. The review logic is already separate from the prompt.
+- **Batch mode:** sanitize a whole folder against one matter's vault.
+- **Scanned PDFs:** OCR, then redact.
+- **Measurement on other document types:** litigation, contracts,
+  correspondence. Everything measured on real documents so far is estate
+  planning and one LLC agreement.
+- **Keychain** in place of the typed passphrase (the seam exists).
+- **Original typeface** for placeholders in PDFs.
+- **A smaller install:** drive the ONNX model without PyTorch.
